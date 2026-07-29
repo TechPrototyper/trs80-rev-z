@@ -2,7 +2,7 @@
 
 **Cat. No. 26-2026** — *The last revision of the Model 1. The one Tandy never built.*
 
-![TRS-80 Model I System](assets/trs80_model1.jpeg)
+![TRS-80 Model I System](assets/trs80_model1.jpeg)<br/>
 *Photo: Thomas Gutmeier ([8bit-Homecomputermuseum](http://www.8bit-homecomputermuseum.at/computer/tandy_trs80_model1.html), Wien)*
 
 An attempt to rebuild the **TRS-80 Model 1 (Revision G)** — fully expanded, as it stood
