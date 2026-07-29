@@ -84,6 +84,9 @@ Crowd Supply, Mouser, or the makers' own shop — see the board README),
 `cd boards/ulx3s && make bit && make prog` puts the machine on real silicon:
 HDMI out, USB keyboard, ROM and disk images from SD card, TRSDOS boot.
 
+![ULX3S FPGA Board Annotated Diagram](assets/ulx3s_diagram.jpg)<br/>
+*The ULX3S FPGA Board — designed by Radiona.org / Goran Mahovlić / Intergalaktik (Lattice ECP5 85F, 32 MB SDRAM, GPDI HDMI out, Micro-SD, FTDI USB debugging, ESP32 slot). Diagram/Photo: Radiona / Intergalaktik / Crowd Supply (Open Hardware).*
+
 Play with it. Boot your disks, run your old programs, try to break it —
 a report that something behaves differently from a real Model 1 (or from
 trs80gp) is exactly the kind of contribution this project runs on.
@@ -119,6 +122,7 @@ Details in [GOVERNANCE.md](GOVERNANCE.md) and [CONTRIBUTING.md](CONTRIBUTING.md)
   authors' explicit permission — see [CREDITS.md](CREDITS.md) and
   [licenses/permissions/](licenses/permissions/).
 - **Model I Photo**: Thomas Gutmeier ([8bit-Homecomputermuseum](http://www.8bit-homecomputermuseum.at/computer/tandy_trs80_model1.html), Wien) — see [CREDITS.md](CREDITS.md).
+- **ULX3S Board Diagram**: Radiona.org / Goran Mahovlić / Intergalaktik / Crowd Supply (Open Hardware) — see [CREDITS.md](CREDITS.md).
 - **No ROMs in this repository.** Level II BASIC is copyrighted (Tandy/Microsoft). The
   design loads ROM images at runtime; [roms/README.md](roms/README.md) explains how to
   obtain and identify them legally.

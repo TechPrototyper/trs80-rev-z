@@ -36,6 +36,7 @@ DAM analysis, xtrs) · **Ira Goldklang** (trs-80.com archive) · **Matthew Reed*
 
 - **Thomas Gutmeier** ([8bit-Homecomputermuseum](http://www.8bit-homecomputermuseum.at/computer/tandy_trs80_model1.html), Wien) — photograph of the TRS-80 Model I system (`assets/trs80_model1.jpeg`). Many thanks to Thomas for his excellent online collection and for sharing this photograph. Thomas' photo actually looks almost identical to my own machine in
 the days, which was sold, unfortunately, because we still had and kept the Model III, which btw still exists but needs repairing.
+- **Radiona.org / Goran Mahovlić / Intergalaktik** — annotated diagram of the ULX3S FPGA board (`assets/ulx3s_diagram.jpg`), released under Open Hardware terms (CERN OHL / CC-BY-SA) via Radiona and Crowd Supply.
 
 The golden-model verification methodology (byte-exact VRAM comparison, simulation before
 silicon) was developed in a predecessor Space Invaders project against trs80gp.
