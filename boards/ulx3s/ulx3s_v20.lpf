@@ -1,0 +1,112 @@
+# TRS-80 Rev Z — ULX3S v2.x/v3.x pin constraints (minimal, grows with the wrapper)
+#
+# Pin sites are board facts from the published ULX3S pinout (Radiona ULX3S,
+# LFE5U-85F, CABGA381). Only the pins this top-level actually uses are
+# constrained; the HDMI (GPDI), USB host and SD pins join with their stages.
+
+BLOCK RESETPATHS;
+BLOCK ASYNCPATHS;
+
+SYSCONFIG CONFIG_IOVOLTAGE=3.3 COMPRESS_CONFIG=ON MCCLK_FREQ=62 SLAVE_SPI_PORT=DISABLE MASTER_SPI_PORT=ENABLE SLAVE_PARALLEL_PORT=DISABLE;
+
+# 25 MHz oscillator
+LOCATE COMP "clk_25mhz" SITE "G2";
+IOBUF  PORT "clk_25mhz" PULLMODE=NONE IO_TYPE=LVCMOS33;
+FREQUENCY PORT "clk_25mhz" 25 MHZ;
+
+# LEDs (led[0] bottom .. led[7] top)
+LOCATE COMP "led[0]" SITE "B2";
+LOCATE COMP "led[1]" SITE "C2";
+LOCATE COMP "led[2]" SITE "C1";
+LOCATE COMP "led[3]" SITE "D2";
+LOCATE COMP "led[4]" SITE "D1";
+LOCATE COMP "led[5]" SITE "E2";
+LOCATE COMP "led[6]" SITE "E1";
+LOCATE COMP "led[7]" SITE "H3";
+IOBUF  PORT "led[0]" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "led[1]" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "led[2]" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "led[3]" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "led[4]" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "led[5]" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "led[6]" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "led[7]" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=4;
+
+# Buttons: btn[0] = PWR (pull-up, pressed = 0), btn[1] = FIRE1 (pull-down,
+# pressed = 1, our reset), rest constrained for future use.
+LOCATE COMP "btn[0]" SITE "D6";
+LOCATE COMP "btn[1]" SITE "R1";
+LOCATE COMP "btn[2]" SITE "T1";
+LOCATE COMP "btn[3]" SITE "R18";
+LOCATE COMP "btn[4]" SITE "V1";
+LOCATE COMP "btn[5]" SITE "U1";
+LOCATE COMP "btn[6]" SITE "H16";
+IOBUF  PORT "btn[0]" PULLMODE=UP   IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "btn[1]" PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "btn[2]" PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "btn[3]" PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "btn[4]" PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "btn[5]" PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "btn[6]" PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+
+# GPDI (DVI out), pseudo-differential — LVCMOS33D drives the complementary
+# pad of each pair. dp[0] blue, dp[1] green, dp[2] red, dp[3] clock.
+LOCATE COMP "gpdi_dp[0]" SITE "A16";
+LOCATE COMP "gpdi_dp[1]" SITE "A14";
+LOCATE COMP "gpdi_dp[2]" SITE "A12";
+LOCATE COMP "gpdi_dp[3]" SITE "A17";
+IOBUF  PORT "gpdi_dp[0]" IO_TYPE=LVCMOS33D DRIVE=4;
+IOBUF  PORT "gpdi_dp[1]" IO_TYPE=LVCMOS33D DRIVE=4;
+IOBUF  PORT "gpdi_dp[2]" IO_TYPE=LVCMOS33D DRIVE=4;
+IOBUF  PORT "gpdi_dp[3]" IO_TYPE=LVCMOS33D DRIVE=4;
+
+# DIP switches (memory configuration, ADR-0005): both OFF = 48K machine,
+# SW2 = 32K, SW1 = bare 16K. sw[2]/sw[3] constrained for future use.
+LOCATE COMP "sw[0]" SITE "E8";
+LOCATE COMP "sw[1]" SITE "D8";
+LOCATE COMP "sw[2]" SITE "D7";
+LOCATE COMP "sw[3]" SITE "E7";
+IOBUF  PORT "sw[0]" PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "sw[1]" PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "sw[2]" PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "sw[3]" PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+
+# micro-SD socket, SPI-role port names on the standard sd_d pads:
+#   sd_clk = SCK (H2), sd_cmd = MOSI (J1), sd_miso = DAT0 (J3),
+#   sd_csn = DAT3 (K2), sd_d1 = DAT1 (H1), sd_d2 = DAT2 (K1).
+# Pin sites and pull modes follow the published ULX3S constraints; DAT2
+# deliberately has no pull-up (ESP32 GPIO12 bootstrapping requirement —
+# the lines are shared with the ESP32).
+LOCATE COMP "sd_clk"  SITE "H2";
+LOCATE COMP "sd_cmd"  SITE "J1";
+LOCATE COMP "sd_miso" SITE "J3";
+LOCATE COMP "sd_d1"   SITE "H1";
+LOCATE COMP "sd_d2"   SITE "K1";
+LOCATE COMP "sd_csn"  SITE "K2";
+IOBUF  PORT "sd_clk"  PULLMODE=UP   IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "sd_cmd"  PULLMODE=UP   IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "sd_miso" PULLMODE=UP   IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "sd_d1"   PULLMODE=UP   IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "sd_d2"   PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "sd_csn"  PULLMODE=UP   IO_TYPE=LVCMOS33 DRIVE=4;
+
+# ESP32 enable/reset: driven low — the ESP32 stays in reset so the shared
+# SD lines belong to this bitstream (companion returns post-M3, own ADR).
+LOCATE COMP "wifi_en" SITE "F1";
+IOBUF  PORT "wifi_en" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+
+# US2 USB host port (keyboard): bidirectional D+/D- plus the resistor
+# control pins (driven low = host-side 15K pull-downs).
+LOCATE COMP "usb_fpga_bd_dp" SITE "D15";
+LOCATE COMP "usb_fpga_bd_dn" SITE "E15";
+LOCATE COMP "usb_fpga_pu_dp" SITE "B12";
+LOCATE COMP "usb_fpga_pu_dn" SITE "C12";
+IOBUF  PORT "usb_fpga_bd_dp" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "usb_fpga_bd_dn" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "usb_fpga_pu_dp" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=16;
+IOBUF  PORT "usb_fpga_pu_dn" PULLMODE=NONE IO_TYPE=LVCMOS33 DRIVE=16;
+
+LOCATE COMP "ftdi_txd" SITE "L4";
+LOCATE COMP "ftdi_rxd" SITE "M1";
+IOBUF  PORT "ftdi_txd" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "ftdi_rxd" PULLMODE=UP IO_TYPE=LVCMOS33;

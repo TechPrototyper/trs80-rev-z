@@ -1,0 +1,84 @@
+// Example DeZog (trszog edition) launch configuration for debugging on the
+// TRS-80 Rev Z. Copy the block you need into your project's
+// .vscode/launch.json. This needs the trszog build of DeZog (the stock
+// marketplace DeZog does not have the "revz" remote); see ADR-0007 and
+// docs/DEBUG-PROTOCOL.md for the full picture.
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // ---- Debug on the real FPGA machine over the FTDI serial link ----
+            // trszog starts the Python bridge for you (unless one is already
+            // listening on the port); the bridge translates JSON-RPC to the
+            // debug core's binary protocol over the board's serial port.
+            "type": "dezog",
+            "request": "launch",
+            "name": "TRS-80 Rev Z — FPGA (revz, serial bridge)",
+            "remoteType": "revz",
+            "revz": {
+                "target": "fpga",            // fpga | physical
+                "dongle": "fpga",            // fpga | physical
+                "transport": {
+                    "kind": "python",        // python | esp32 | serial
+                    // the board's FTDI device (macOS: /dev/cu.usbserial-*,
+                    // Linux: /dev/ttyUSB*)
+                    "serial": "/dev/cu.usbserial-XXXX",
+                    // path to the bridge in your trs80-rev-z checkout
+                    "bridge": "/path/to/trs80-rev-z/tools/trszog_bridge.py",
+                    "autoStart": true,       // start the bridge if none is running
+                    "baud": 460800           // optional; this is the default
+                }
+            },
+            "zmac": [
+                { "path": "${workspaceFolder}/zout/your_program.bds" }
+            ],
+            "load": "${workspaceFolder}/zout/your_program.cmd",
+            "topOfStack": "0x8000",
+            "rootFolder": "${workspaceFolder}",
+            "startAutomatically": false
+        },
+        {
+            // ---- Debug over the network, via the on-board ESP32 server ----
+            // (once the ESP32 debug server exists, ADR-0008). Nothing is
+            // spawned; DeZog just connects to host:port.
+            "type": "dezog",
+            "request": "launch",
+            "name": "TRS-80 Rev Z — FPGA (revz, ESP32/WiFi)",
+            "remoteType": "revz",
+            "revz": {
+                "target": "fpga",
+                "dongle": "fpga",
+                "transport": {
+                    "kind": "esp32",
+                    "host": "trs80.local",
+                    "port": 49152
+                }
+            },
+            "zmac": [
+                { "path": "${workspaceFolder}/zout/your_program.bds" }
+            ],
+            "load": "${workspaceFolder}/zout/your_program.cmd",
+            "topOfStack": "0x8000",
+            "rootFolder": "${workspaceFolder}",
+            "startAutomatically": false
+        },
+        {
+            // ---- No hardware: the in-process software emulator ----
+            "type": "dezog",
+            "request": "launch",
+            "name": "TRS-80 — software simulator",
+            "remoteType": "trs80sim",
+            "trs80sim": {
+                "model": 1,                  // 1 = Model I, 3 = Model III
+                "screen": true
+            },
+            "zmac": [
+                { "path": "${workspaceFolder}/zout/your_program.bds" }
+            ],
+            "load": "${workspaceFolder}/zout/your_program.cmd",
+            "topOfStack": "0x8000",
+            "rootFolder": "${workspaceFolder}",
+            "startAutomatically": false
+        }
+    ]
+}

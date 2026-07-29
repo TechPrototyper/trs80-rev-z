@@ -1,0 +1,24 @@
+
+__pycache__/
+.DS_Store
+*.asc
+*.bit
+*.cas
+*.dmk
+*.dsk
+*.fst
+*.json
+*.jv1
+*.jv3
+*.svf
+*.vcd
+# Build artifacts
+# OS noise
+# ROM images and other copyrighted binaries — never committed (see roms/README.md)
+# Synthesis netlist (make synth) — regenerable, not committed
+build/
+obj_dir/
+roms/*.bin
+roms/*.mem
+roms/*.rom
+sim/build/*.json

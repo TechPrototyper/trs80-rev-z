@@ -1,0 +1,25 @@
+# TRS-80 Rev Z — yosys synthesis script for the ULX3S board top-level.
+# Run from boards/ulx3s/ (paths and the chargen hex are relative to here).
+
+read_verilog -DTV80_REFRESH -sv \
+  rtl/ulx3s_top.v rtl/m1_pll.v rtl/m1_pll_dvi.v \
+  rtl/m1_scan_fb.v rtl/dvi_800x600.v rtl/tmds_encoder.v rtl/dvi_serializer.v \
+  rtl/m1_hid_keys.v rtl/m1_selftest_loader.v rtl/dbg_uart.v \
+  rtl/m1_sd_fs.v rtl/sd_spi_host.v rtl/m1_dmk_fetch.v \
+  vendor/usb_hid_host/usb_hid_host.v vendor/usb_hid_host/usb_hid_host_rom.v \
+  ../../rtl/m1_core.v ../../rtl/m1_cpu_clock.v ../../rtl/m1_video_timing.v \
+  ../../rtl/m1_video_gen.v ../../rtl/m1_vram.v ../../rtl/m1_addr_decode.v \
+  ../../rtl/m1_cpu.v ../../rtl/m1_rom.v ../../rtl/m1_ram.v ../../rtl/m1_ei_ram.v ../../rtl/m1_ei.v ../../rtl/m1_fdc.v ../../rtl/m1_drives.v ../../rtl/m1_debug.v \
+  ../../rtl/m1_io.v ../../rtl/m1_keyboard.v \
+  ../../rtl/vendor/tv80/tv80_core.v ../../rtl/vendor/tv80/tv80_alu.v \
+  ../../rtl/vendor/tv80/tv80_mcode.v ../../rtl/vendor/tv80/tv80_reg.v
+
+# The chargen table default path is relative to sim/; point it here.
+chparam -set FONT_HEX "../../rtl/mcm6670_cg1.hex" m1_core
+
+# -noabc9: the abc9 optimizer asserts on this design ("Visited AIG node
+# more than once" in &mfs) and yosys then falls back to the UNOPTIMIZED
+# netlist — twice the LUTs, double-digit place&route minutes. The
+# classic abc flow is deterministic, slightly less optimal than a
+# working abc9, and far better than a fallen-back one.
+synth_ecp5 -noabc9 -top ulx3s_top -json build/ulx3s_top.json

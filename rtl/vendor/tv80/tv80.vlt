@@ -1,0 +1,12 @@
+`verilator_config
+// Lint waivers for the vendored tv80 core ONLY (see ADR-0003).
+// tv80 predates lint-clean Verilog style; its dominant warning is BLKSEQ
+// (blocking assignments in sequential blocks, 962 occurrences) — a rewrite,
+// not a fix. Upstream's own regression runs on Verilator with these
+// constructs. Scope is limited to this directory; all first-party RTL in
+// rtl/ remains fully -Wall clean.
+lint_off -rule BLKSEQ        -file "*/vendor/tv80/*"
+lint_off -rule UNUSEDSIGNAL  -file "*/vendor/tv80/*"
+lint_off -rule UNUSEDPARAM   -file "*/vendor/tv80/*"
+lint_off -rule SYNCASYNCNET  -file "*/vendor/tv80/*"
+lint_off -rule VARHIDDEN     -file "*/vendor/tv80/*"
