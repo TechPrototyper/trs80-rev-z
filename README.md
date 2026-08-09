@@ -79,6 +79,19 @@ make golden             # byte-exact VRAM diff against trs80gp (local install)
 make frames             # PNG frame dumps of the simulated screen
 ```
 
+**No board?** You can also run the machine interactively on your desktop
+using the Verilator-based SDL emulator in [`sim/emu/`](sim/emu/README.md):
+
+```
+cd sim/emu && make
+./build/emu/Vm1_core --rom=/path/to/rom.hex --disk0=/path/to/newdos.dmk
+```
+
+An SDL2 window opens with the live TRS-80 display and keyboard input.
+Note that keyboard support is not yet fully implemented — not every key
+combination maps correctly; a more complete mapping is planned for a future
+update. See [`sim/emu/README.md`](sim/emu/README.md) for all options.
+
 With a [ULX3S-85F](boards/ulx3s/README.md#getting-a-board) (available via
 Crowd Supply, Mouser, or the makers' own shop — see the board README),
 `cd boards/ulx3s && make bit && make prog` puts the machine on real silicon:
