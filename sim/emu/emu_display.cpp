@@ -4,6 +4,7 @@
 // tracking from the lagging column counter.
 
 #include "emu_display.h"
+#include "emu_keyboard.h"
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
@@ -87,16 +88,17 @@ bool EmuDisplay::present()
     SDL_RenderClear(ren_);
     SDL_RenderCopy(ren_, tex_, nullptr, nullptr);
     SDL_RenderPresent(ren_);
-
-    return poll_events();
+    return true;
 }
 
-bool EmuDisplay::poll_events()
+bool EmuDisplay::poll_events(EmuKeyboard* kbd)
 {
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
         if (ev.type == SDL_QUIT)
             return false;
+        if (kbd)
+            kbd->handle(ev);
     }
     return true;
 }

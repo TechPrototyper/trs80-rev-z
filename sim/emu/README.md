@@ -55,8 +55,8 @@ Verilog `$readmemh` format (one hex byte per line, no address tags).
 ### DMK disk images
 
 Standard DMK binary files (raw bytes, not the hex format used internally by
-the testbenches).  Pass with `--disk0` … `--disk3`.  Drive 4 and above are
-not supported by the hardware.
+the testbenches).  Pass with `--disk0` … `--disk3`.  The hardware supports
+drives 0–3 only; drive numbers above 3 do not exist.
 
 ## Options
 

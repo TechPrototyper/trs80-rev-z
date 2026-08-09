@@ -17,6 +17,10 @@
 #include <cstdint>
 #include <SDL2/SDL.h>
 
+// Forward declaration: emu_display optionally forwards key events to the
+// keyboard model (avoids a circular header dependency).
+class EmuKeyboard;
+
 class EmuDisplay {
 public:
     // scale: integer pixel multiplier (2 or 3 recommended).
@@ -32,9 +36,9 @@ public:
     // Render the current framebuffer.  Returns false if quit requested.
     bool present();
 
-    // Drain pending SDL events.  Returns false if quit requested.
-    // (Call this even when not presenting to keep the window responsive.)
-    bool poll_events();
+    // Drain pending SDL events, forwarding key events to the handler.
+    // Returns false if quit requested.  Call once per rendered frame.
+    bool poll_events(EmuKeyboard* kbd = nullptr);
 
 private:
     static constexpr int W = 384;

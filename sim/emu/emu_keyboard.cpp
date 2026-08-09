@@ -142,7 +142,7 @@ bool EmuKeyboard::translate(const SDL_Keysym& sym,
 
     default: return false;
     }
-    (void)shifted;
+    return false;
 }
 
 void EmuKeyboard::handle(const SDL_Event& ev)

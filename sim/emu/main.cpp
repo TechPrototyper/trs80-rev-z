@@ -32,7 +32,6 @@
 #include "emu_keyboard.h"
 #include "emu_display.h"
 
-#include <SDL2/SDL.h>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -276,14 +275,8 @@ int main(int argc, char** argv)
         // --- Present frame once per VDRV rising edge (end of vertical blank) ---
         static uint8_t prev_vdrv = 0;
         if (!prev_vdrv && top.vdrv) {
-            // Poll SDL events (keyboard) then render
-            SDL_Event ev;
-            while (SDL_PollEvent(&ev)) {
-                if (ev.type == SDL_QUIT) { running = false; break; }
-                kbd.handle(ev);
-            }
-            if (running)
-                running = disp.present();
+            disp.present();
+            running = disp.poll_events(&kbd);
         }
         prev_vdrv = top.vdrv;
 
