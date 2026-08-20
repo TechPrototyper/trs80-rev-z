@@ -86,7 +86,10 @@ def boot_sector():
     return sec + bytes(SEC_LEN - len(sec))
 
 
-def build_track(t, boot=False):
+DAM_CYCLE = [0xFB, 0xFA, 0xF9, 0xF8]
+
+
+def build_track(t, boot=False, dam_track=None):
     raw = bytearray()
     pointers = []
     raw += b"\xFF" * 16                      # post-index gap
@@ -99,7 +102,10 @@ def build_track(t, boot=False):
         raw += b"\xFF" * 11 + b"\x00" * 6
         payload = boot_sector() if boot and t == 0 and s == 0 \
                   else sector_data(t, s)
-        dat = bytes([0xFB]) + payload
+        # DAM test track: sectors 0..3 carry FB/FA/F9/F8 (the 1771's four
+        # record types; TRS-80 DOS directories use FA/F8), rest normal.
+        dam = DAM_CYCLE[s] if dam_track == t and s < 4 else 0xFB
+        dat = bytes([dam]) + payload
         c = crc16(dat)
         raw += dat + bytes([c >> 8, c & 0xFF])
         raw += b"\xFF" * 10                  # gap 3
@@ -174,6 +180,9 @@ def main():
                     help="mixed-density image: track 0 SD (doubled bytes,"
                          " boot convention), tracks 1+ MFM DD 18x256;"
                          " container 0x1900/flags 0x10 like wild DMKs")
+    ap.add_argument("--damtrk", type=int, default=None,
+                    help="SD track whose sectors 0..3 carry the DAMs"
+                         " FB/FA/F9/F8 (record-type probe)")
     args = ap.parse_args()
 
     hdr = bytearray(16)
@@ -190,7 +199,7 @@ def main():
         hdr[2] = TRACK_LEN & 0xFF
         hdr[3] = TRACK_LEN >> 8
         hdr[4] = 0x50                        # SD single-byte + single-sided
-        img = bytes(hdr) + b"".join(build_track(t, args.boot)
+        img = bytes(hdr) + b"".join(build_track(t, args.boot, args.damtrk)
                                     for t in range(args.tracks))
 
     with open(args.out + ".dmk", "wb") as f:

@@ -70,4 +70,12 @@ Kept deliberately public — this is the quality bar working as intended:
 - big80 was initially recorded as *unlicensed* because only a `LICENSE` file was searched
   for; the Apache-2.0 grant lived in the README. Rule since: search the whole README.
 - An earlier spec draft attributed George Phillips' 128×192 to the Model 1 (see §3.2) — corrected.
+- The WD1771 Type II read status carried only **one** record-type bit (S5,
+  the 1791's "deleted DAM" shape) — the 1771 encodes **two**: S6:S5 =
+  ~DAM[1:0], i.e. FB→00, FA→20, F9→40, F8→60 (probed against trs80gp,
+  `make golden-fdc-dam`, 2026-08-20). Found the honest way: NEWDOS/80
+  booted fine but `DIR` died — TRS-80 DOSes write directory sectors with
+  FA/F8 DAMs and verify the record type on every directory read, while
+  boot sectors are plain FB. Fixed in `m1_fdc.v`; the golden boot chain
+  had never exercised a directory read, which is why it stayed green.
 

@@ -34,8 +34,11 @@
 // Contract pinned against trs80gp 2.5.5 (probes, 2026-07-24):
 //   - reset: command/track/sector/data all 0x00 (sector is NOT 1)
 //   - Type I status: {~ready, wprt, hld(0), seek_err, crc(0), tr00,
-//     index, busy}; Type II/III status: {~ready, 0, rec_type, rnf,
-//     crc(0), lost, drq, busy} — the mux follows the last command class
+//     index, busy}; Type II/III status: {~ready, wprt|rt1, rt0, rnf,
+//     crc(0), lost, drq, busy} — the mux follows the last command class.
+//     rt1:rt0 is the read record type: 1771/FM = ~DAM[1:0] (FB=00 FA=01
+//     F9=10 F8=11 — TRS-80 DOS directories use FA/F8 and check this),
+//     1791/MFM = deleted flag in rt0 only (fdcdamtest probe, 2026-08-20)
 //   - INTRQ raises at command completion, cleared by reading the status
 //     register or writing a new command (37E0 clears only the RTC half)
 //   - DRQ paces one byte per 64 us (FM, 125 kbit/s); an unserviced DRQ
@@ -115,11 +118,16 @@ module m1_fdc #(
     // ------------------------------------------------------------------
     reg [7:0] track, sector, data;
     reg       busy, seek_err;
-    reg       drq, lost, rnf, rec_type;
+    reg       drq, lost, rnf;
+    reg [1:0] rec_type;              // Type II read: S6:S5 record type —
+                                     // 1771: ~DAM[1:0] (FB=00 FA=01 F9=10
+                                     // F8=11), 1791: S5 only (deleted DAM);
+                                     // probed against trs80gp (fdcdamtest)
     reg       t2ctx;                 // status mux: last command Type II/III
 
     wire [7:0] status_t1 = {~ready, wprt, 1'b0, seek_err, 1'b0, tr00, ip, busy};
-    wire [7:0] status_t2 = {~ready, s_wprt, rec_type, rnf, 1'b0, lost, drq, busy};
+    wire [7:0] status_t2 = {~ready, s_wprt | rec_type[1], rec_type[0], rnf,
+                            1'b0, lost, drq, busy};
     wire [7:0] status    = t2ctx ? status_t2 : status_t1;
 
     wire rd_stat = sel && (a == 2'd0) && !rd_n;
@@ -261,7 +269,7 @@ module m1_fdc #(
             drq      <= 1'b0;
             lost     <= 1'b0;
             rnf      <= 1'b0;
-            rec_type <= 1'b0;
+            rec_type <= 2'd0;
             t2ctx    <= 1'b0;
             intrq    <= 1'b0;
             step     <= 1'b0;
@@ -404,7 +412,7 @@ module m1_fdc #(
                                 drq      <= 1'b0;
                                 lost     <= 1'b0;
                                 rnf      <= 1'b0;
-                                rec_type <= 1'b0;
+                                rec_type <= 2'd0;
                                 s_wprt   <= 1'b0;
                                 is_ra    <= (wd_d[7:4] == 4'hC);
                                 is_rt    <= (wd_d[7:4] == 4'hE);
@@ -653,7 +661,10 @@ module m1_fdc #(
                             us_byte   <= byte_us_w;
                             rstate    <= W_TICK;
                         end else begin
-                            rec_type  <= ~&tb_q[1:0];    // F8-FA: deleted
+                            // 1771 (FM): S6:S5 = ~DAM[1:0] — four record
+                            // types; 1791 (MFM): S5 = deleted DAM, S6 = 0
+                            rec_type  <= e_dd ? {1'b0, ~&tb_q[1:0]}
+                                              : ~tb_q[1:0];
                             rd_pos    <= rd_pos + step_w;
                             rd_n_left <= 13'd128 << id_ln;
                             us_byte   <= byte_us_w;
