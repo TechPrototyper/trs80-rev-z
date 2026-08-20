@@ -25,44 +25,53 @@ to bit-exact stock behavior). Verification is not "looks right on screen" but by
 comparison against golden models, predominantly George Phillips' trs80gp emulator, 
 simulation before silicon.
 
+## Where it stands
+
+The machine is real: it boots TRSDOS 2.3 and NEWDOS/80 2.0 from SD card to
+`DOS READY` on a physical ULX3S — monitor over HDMI, USB keyboard, mixed-density
+DMK disks, video snow included. On top sits a debug core that halts and
+single-steps the live Z80 from VS Code. And if you have no board, the same RTL
+runs as an interactive desktop emulator under Verilator ([`sim/emu/`](sim/emu/README.md)) —
+same machine, same disks, same debugger.
+
+I can state all that plainly for the same reason I can be corrected on it:
+checkmarks appear in this repository only when something runs *and is verified*
+byte-exact against a golden model — never before. The spec has been wrong more
+than once, and the corrections that got it here are logged in the open
+([docs/RESEARCH.md](docs/RESEARCH.md)).
+
 ## Who built this and why
 
-I'm a software person, and an educated business person. While my background covers decades of building
-systems in different roles, I am not into microelectronics. The TRS-80 Models 1 and III are
-the machines I learnt on. I owned the grey boxes back then, as a child born in 1968,
-and now I've rebuilt this one carefully in RTL, partly *in order to* finally understand
-its hardware for real, partly because of the ehtusiasm I feel about Open Source Hardware and 
-FPGAs. So this is my first FPGA project!
+I'm a software person with decades of systems work behind me — but not a
+microelectronics person. The TRS-80 Model 1 and Model III are the machines I
+learned on as a kid (born 1968, grey boxes on the desk), and rebuilding this one
+in RTL is how I finally understand its hardware for real. It is my first FPGA
+project, carried by genuine enthusiasm for open source hardware and open
+toolchains.
 
-The machine as it stands boots NEWDOS/80 2.0 from SD card to `NEWDOS/80 READY` on a real ULX3S
- — Monitor attached over HDMI, with a USB keyboard. On top I built a debug core that halts and
- single-steps the live Z80 from VS Code. I can state that plainly for the same reason
-I can be corrected on it: checkmarks appear in this repository when something runs *and is verified*
-against a golden model — never before. The spec has been wrong more than once, and the corrections
-that got it here are logged in the open ([docs/RESEARCH.md](docs/RESEARCH.md)).
+What holds it together is specification discipline: the reference configuration,
+mode concept, and FDC architecture are worked out in [docs/SPEC.md](docs/SPEC.md),
+the prior art is surveyed with sources ([docs/RESEARCH.md](docs/RESEARCH.md),
+[CREDITS.md](CREDITS.md)), and the plan is in [ROADMAP.md](ROADMAP.md).
 
-What holds it together is specification discipline: the reference configuration, mode
-concept, and FDC architecture are worked out ([docs/SPEC.md](docs/SPEC.md)), the prior
-art is surveyed with sources ([docs/RESEARCH.md](docs/RESEARCH.md), [CREDITS.md](CREDITS.md)),
-and the plan is in [ROADMAP.md](ROADMAP.md).
-
-Most of actual plumbing was created and tested using frontier AI solutions, predominantly by
-Anthropic's Claude in the Claude Code harness. And while this may be controversial for some,
-I'm convinced it's a valid approach to learning, gaining personal insights, community contribution
-and a lot of fun in the open hardware space. My genuine contribution was of course the desire to
-have this built, and a large scratchpad full of ideas about what to build, how to build it,
-design principles to follow and trade-offs to consider. I've seen some systems built on Model 1
-principles reaching for High Resolution Graphics and 512KB RAM, yet the problem often is that
-noone has ever built software for these systems. My core motivation all started when I tried
-to move into Z-80 Assembler some years ago, and I will lay out the whole story how I got fromt his
-moment to here at a different time and a different place.
+Most of the actual plumbing was written and tested with heavy AI assistance —
+predominantly Anthropic's Claude in the Claude Code harness — and I say so
+openly. My contribution is the machine I wanted built: a large scratchpad of
+ideas, design principles, and trade-offs, plus the discipline that nothing gets
+a checkmark without verification. Some Model-1-descendant systems reach for
+hi-res graphics and 512 KB RAM; the trouble is that no period software ever
+existed for them. This project goes the other way: first the machine as Tandy
+shipped it, bit-exact, then the revision Tandy never built — one reversible
+switch at a time. How I got from "I should finally learn Z-80 assembly" to
+here is a story for another time and place.
 
 
 ## Scope
 
 | Tier | Contents |
 |---|---|
-| **Committed** (specified, actively worked on) | M1–M3: Rev G mainboard · Level II 1.3 · 48 KB · video incl. snow · cassette · expansion interface · WD1771/1791 dual-controller FDC with **mixed-density** disk support (DMK) · Debug core with VS-Code integration *(almost completely built, live on hardware — see below)*
+| **Committed, built and golden-verified** | Rev G mainboard · Level II 1.3 · 48 KB · video incl. snow · expansion interface · WD1771/1791 dual-controller FDC with **mixed-density** disk support (DMK) · debug core with VS-Code integration · desktop emulator — all live on hardware and byte-exact against trs80gp |
+| **Committed, next up** | Cassette (M2, the last gap in the base machine) · RS-232-C (M5) · Centronics (M6) |
 | **Vision** (direction, deliberately open) | ESP32 companion (untethered debug server, disk sources, telemetry, drive sound) · virtual expansion-card bus · TRS-IO/FreHD · PCG-80 · raster interrupt · CP/M (Omikron mapper + 64 KB Rev-Z board) · enclosure |
 
 Details and reasoning in [ROADMAP.md](ROADMAP.md). What belongs in Rev Z is a standing
@@ -87,10 +96,12 @@ cd sim/emu && make
 ./build/emu/Vm1_core --rom=/path/to/rom.hex --disk0=/path/to/newdos.dmk
 ```
 
-An SDL2 window opens with the live TRS-80 display and keyboard input.
-Note that keyboard support is not yet fully implemented — not every key
-combination maps correctly; a more complete mapping is planned for a future
-update. See [`sim/emu/README.md`](sim/emu/README.md) for all options.
+An SDL2 window opens with the live TRS-80 display and keyboard input
+(glyph-faithful mapping, mirroring the board's USB-HID front end). The
+emulator can also script its own input (`--type='BASIC\n'`) and expose
+the debug core on a pseudo-tty (`--debug-pty`) — so DeZog debugs the
+simulated machine exactly like the physical board. See
+[`sim/emu/README.md`](sim/emu/README.md) for all options.
 
 With a [ULX3S-85F](boards/ulx3s/README.md#getting-a-board) (available via
 Crowd Supply, Mouser, or the makers' own shop — see the board README),
@@ -116,7 +127,9 @@ debug core's own binary wire protocol are documented in
 [docs/DEBUG-PROTOCOL.md](docs/DEBUG-PROTOCOL.md), so you can attach a
 different debugger, or drive the core directly. Today a reference bridge
 (`tools/trszog_bridge.py`) connects the two over the board's FTDI serial
-port; a first-class trszog remote type that starts it for you is next (see
+port — or over the desktop emulator's `--debug-pty`, which makes the
+simulated machine just another debug target; a first-class trszog remote
+type that starts the bridge for you is next (see
 [ADR-0007](docs/decisions/0007-trszog-integration.md)). The architecture,
 and the road to a dongle that debugs a *real* TRS-80 over a ribbon cable,
 is in [ADR-0006](docs/decisions/0006-debug-architecture.md).
