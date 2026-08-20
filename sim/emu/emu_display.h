@@ -15,7 +15,7 @@
 
 #pragma once
 #include <cstdint>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 // Forward declaration: emu_display optionally forwards key events to the
 // keyboard model (avoids a circular header dependency).
@@ -36,7 +36,8 @@ public:
     // Render the current framebuffer.  Returns false if quit requested.
     bool present();
 
-    // Drain pending SDL events, forwarding key events to the handler.
+    // Drain pending SDL events, then rebuild the keyboard matrix from the
+    // refreshed SDL keyboard state.
     // Returns false if quit requested.  Call once per rendered frame.
     bool poll_events(EmuKeyboard* kbd = nullptr);
 
@@ -44,6 +45,12 @@ private:
     static constexpr int W = 384;
     static constexpr int H = 192;
 
+public:
+    // Show the simulated frame count in the window title (scripting aid:
+    // --type-at is frame-based and the simulation is deterministic).
+    void set_frame(uint64_t frame);
+
+private:
     SDL_Window*   win_  = nullptr;
     SDL_Renderer* ren_  = nullptr;
     SDL_Texture*  tex_  = nullptr;

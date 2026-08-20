@@ -69,6 +69,14 @@ void EmuDisplay::write_pixel(uint8_t pixel,
     fb_[y * W + x] = pixel ? 0xFF : 0x00;
 }
 
+void EmuDisplay::set_frame(uint64_t frame)
+{
+    char t[64];
+    snprintf(t, sizeof t, "TRS-80 Model I — Rev Z  [f %llu]",
+             (unsigned long long)frame);
+    SDL_SetWindowTitle(win_, t);
+}
+
 bool EmuDisplay::present()
 {
     // Upload fb_ to texture as ARGB8888 (grey = 0xFF or 0x00).
@@ -97,8 +105,10 @@ bool EmuDisplay::poll_events(EmuKeyboard* kbd)
     while (SDL_PollEvent(&ev)) {
         if (ev.type == SDL_QUIT)
             return false;
-        if (kbd)
-            kbd->handle(ev);
     }
+    // The event pump above refreshed SDL's keyboard state; derive the whole
+    // matrix from it ("current report wins", like m1_hid_keys.v).
+    if (kbd)
+        kbd->rebuild();
     return true;
 }

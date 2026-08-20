@@ -43,6 +43,13 @@ EmuDisk::EmuDisk(const std::string paths[4], const bool wp_override[4])
         dr.ntracks  = (int)dr.image[1];
         dr.tracklen = (int)dr.image[2] | ((int)dr.image[3] << 8);
         dr.dbl      = (dr.image[4] & 0xC0) == 0x00;  // stored doubled
+        // Double-sided image (header bit 4 clear and the file actually
+        // holds two track blocks per cylinder): the Model 1 drive has a
+        // single head, so only side 0 exists for the machine — the track
+        // stride doubles and the side-1 blocks are skipped.
+        dr.sides    = (!(dr.image[4] & 0x10) &&
+                       (long)dr.image.size() >=
+                           16L + 2L * dr.ntracks * dr.tracklen) ? 2 : 1;
         dr.mounted  = (dr.ntracks > 0 && dr.tracklen >= 130 &&
                        dr.tracklen <= 8192);
 
@@ -53,9 +60,10 @@ EmuDisk::EmuDisk(const std::string paths[4], const bool wp_override[4])
                     d, dr.ntracks, dr.tracklen);
         } else {
             fprintf(stderr,
-                    "emu_disk: drive %d mounted, %d tracks, len=%d%s%s\n",
+                    "emu_disk: drive %d mounted, %d tracks, len=%d%s%s%s\n",
                     d, dr.ntracks, dr.tracklen,
                     dr.dbl  ? ", dbl"  : "",
+                    dr.sides == 2 ? ", 2-sided (side 0 only)" : "",
                     dr.wp   ? ", WP"   : "");
             fdc_disk |= (uint8_t)(1u << d);
             if (dr.wp)
@@ -81,6 +89,9 @@ void EmuDisk::tick()
             cur_drv_   = trk_drv  & 0x3;
             cur_track_ = trk_track & 0x7F;
             byte_idx_  = 0;
+            if (getenv("EMU_DISK_LOG"))
+                fprintf(stderr, "emu_disk: fetch drv %d trk %d\n",
+                        cur_drv_, cur_track_);
 
             const Drive& dr = drives_[cur_drv_];
             if (!dr.mounted || cur_track_ >= dr.ntracks) {
@@ -110,7 +121,7 @@ void EmuDisk::tick()
     // ----------------------------------------------------------------
     case State::READ: {
         const Drive& dr = drives_[cur_drv_];
-        int base = 16 + cur_track_ * dr.tracklen;
+        int base = 16 + cur_track_ * dr.sides * dr.tracklen;
         trk_vld  = 1;
         trk_idx  = (uint16_t)byte_idx_;
         trk_data = dr.image[(size_t)(base + byte_idx_)];
@@ -168,7 +179,7 @@ void EmuDisk::tick()
             state_ = State::WB_FETCH;
         } else {
             // Commit to in-memory image.
-            int base = 16 + cur_track_ * dr.tracklen;
+            int base = 16 + cur_track_ * dr.sides * dr.tracklen;
             memcpy(drives_[cur_drv_].image.data() + base,
                    wb_buf_.data(),
                    (size_t)dr.tracklen);

@@ -68,6 +68,7 @@ private:
         bool                 wp       = false;
         int                  ntracks  = 0;
         int                  tracklen = 0;
+        int                  sides    = 1;   // 2: DS image, side 0 served
         bool                 dbl      = false;
         std::vector<uint8_t> image;  // raw DMK bytes
     };

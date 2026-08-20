@@ -15,6 +15,17 @@
 //   --no-ei           Set ei_ram_cfg=00 (16K machine, no EI/FDC)
 //   --ei16            Set ei_ram_cfg=01 (32K machine)
 //   --ei32            Set ei_ram_cfg=10 (48K machine, default)
+//   --no-percom       Percom Doubler absent (default: fitted, like DIP4 OFF
+//                     on the board) — some DOS boot paths probe the doubler
+//   --type=<text>     Auto-type text into the machine ("\n" = ENTER), e.g.
+//                     --type="BASIC\n". Starts after --type-at frames.
+//   --type-at=<n>     First frame of auto-typing (default 900, ~15 machine
+//                     seconds — past the DOS boot banner)
+//   --debug-pty       Expose the m1_debug binary-v0 link on a pseudo-tty.
+//                     The slave path is printed at startup; point
+//                     tools/trszog_bridge.py --serial at it and the emulator
+//                     appears to DeZog exactly like the board on its FTDI
+//                     port (ADR-0006/0007; baud rate is meaningless on a pty)
 //
 // The ROM file must be in Verilog $readmemh format — one hex byte per line,
 // no address tags.  trs80gp can dump the ROM; see roms/README.md.
@@ -36,12 +47,22 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
+
+#include <fcntl.h>
+#include <termios.h>
+#include <unistd.h>
+#if defined(__APPLE__)
+#include <util.h>       // openpty
+#else
+#include <pty.h>        // openpty (link with -lutil on glibc)
+#endif
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -118,6 +139,147 @@ private:
 };
 
 // ---------------------------------------------------------------------------
+// Auto-typing: feed a scripted key sequence into the matrix, one glyph at a
+// time, several frames held per key so the ROM/DOS keyboard poll cannot miss
+// it. Deterministic (frame-counted), so scripted runs are reproducible.
+// ---------------------------------------------------------------------------
+class AutoType {
+public:
+    void program(const std::string& text, int start_frame)
+    {
+        if (text.empty()) return;
+        steps_.push_back({0, start_frame});
+        for (size_t i = 0; i < text.size(); i++) {
+            char c = text[i];
+            if (c == '\\' && i + 1 < text.size() && text[i+1] == 'n')
+                { c = '\n'; i++; }
+            uint64_t m = glyph_mask(c);
+            if (!m) continue;                    // no Model 1 equivalent
+            steps_.push_back({m, 14});           // held (> 2 DOS scan ticks)
+            steps_.push_back({0, 10});           // released
+        }
+    }
+
+    // Advance one frame; returns the matrix contribution for this frame.
+    void frame()
+    {
+        if (steps_.empty()) { cur_ = 0; return; }
+        cur_ = steps_.front().first;
+        if (--steps_.front().second <= 0)
+            steps_.pop_front();
+    }
+
+    uint64_t keys() const { return cur_; }
+
+private:
+    static uint64_t bit(int row, int col)
+        { return uint64_t(1) << (row * 8 + col); }
+
+    // ASCII -> Model 1 chord (matrix layout as in emu_keyboard.h).
+    static uint64_t glyph_mask(char c)
+    {
+        const uint64_t SH = bit(7, 0);
+        if (c >= 'a' && c <= 'z') c = (char)(c - 'a' + 'A');
+        if (c >= 'A' && c <= 'Z') {
+            int n = c - 'A' + 1;                 // @=0, A=1 .. Z=26
+            return bit(n >> 3, n & 7);
+        }
+        if (c >= '1' && c <= '7') return bit(4, c - '0');
+        switch (c) {
+        case '0':  return bit(4, 0);
+        case '8':  return bit(5, 0);
+        case '9':  return bit(5, 1);
+        case '@':  return bit(0, 0);
+        case ':':  return bit(5, 2);
+        case ';':  return bit(5, 3);
+        case ',':  return bit(5, 4);
+        case '-':  return bit(5, 5);
+        case '.':  return bit(5, 6);
+        case '/':  return bit(5, 7);
+        case '!':  return bit(4, 1) | SH;
+        case '"':  return bit(4, 2) | SH;
+        case '#':  return bit(4, 3) | SH;
+        case '$':  return bit(4, 4) | SH;
+        case '%':  return bit(4, 5) | SH;
+        case '&':  return bit(4, 6) | SH;
+        case '\'': return bit(4, 7) | SH;
+        case '(':  return bit(5, 0) | SH;
+        case ')':  return bit(5, 1) | SH;
+        case '*':  return bit(5, 2) | SH;
+        case '+':  return bit(5, 3) | SH;
+        case '=':  return bit(5, 5) | SH;
+        case '<':  return bit(5, 4) | SH;
+        case '>':  return bit(5, 6) | SH;
+        case '?':  return bit(5, 7) | SH;
+        case ' ':  return bit(6, 7);
+        case '\n': return bit(6, 0);
+        default:   return 0;
+        }
+    }
+
+    std::deque<std::pair<uint64_t, int>> steps_;
+    uint64_t cur_ = 0;
+};
+
+// ---------------------------------------------------------------------------
+// Debug link on a pseudo-tty: the emulator-side stand-in for the board's
+// FTDI serial port. Byte queues are serviced once per frame (a syscall per
+// simulated clock would dominate the run time); the per-tick valid/ready
+// handshake against m1_core only touches the queues.
+// ---------------------------------------------------------------------------
+class DebugPty {
+public:
+    bool open()
+    {
+        struct termios tio;
+        cfmakeraw(&tio);
+        tio.c_cflag |= CREAD | CS8;
+        int slave = -1;
+        char name[128];
+        if (openpty(&master_, &slave, name, &tio, nullptr) != 0) {
+            perror("openpty");
+            return false;
+        }
+        // The slave stays open on our side so the pty survives bridge
+        // restarts (no EIO on the master when no one is attached).
+        (void)slave;
+        fcntl(master_, F_SETFL, O_NONBLOCK);
+        printf("emu_debug: binary-v0 debug link on %s\n", name);
+        printf("emu_debug: tools/trszog_bridge.py --serial %s\n", name);
+        fflush(stdout);
+        return true;
+    }
+
+    bool enabled() const { return master_ >= 0; }
+
+    // Called once per frame: move bytes between the pty and the queues.
+    void service()
+    {
+        uint8_t buf[512];
+        ssize_t n;
+        while ((n = ::read(master_, buf, sizeof buf)) > 0)
+            for (ssize_t i = 0; i < n; i++) rx_.push_back(buf[i]);
+        while (!tx_.empty()) {
+            size_t chunk = 0;
+            while (chunk < sizeof buf && chunk < tx_.size())
+                { buf[chunk] = tx_[chunk]; chunk++; }
+            n = ::write(master_, buf, chunk);
+            if (n <= 0) break;                    // EAGAIN: retry next frame
+            tx_.erase(tx_.begin(), tx_.begin() + n);
+        }
+    }
+
+    bool     rx_pending() const { return !rx_.empty(); }
+    uint8_t  rx_front()   const { return rx_.front(); }
+    void     rx_pop()           { rx_.pop_front(); }
+    void     tx_push(uint8_t b) { tx_.push_back(b); }
+
+private:
+    int master_ = -1;
+    std::deque<uint8_t> rx_, tx_;
+};
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 int main(int argc, char** argv)
@@ -127,6 +289,10 @@ int main(int argc, char** argv)
     bool        disk_wp[4] = {};
     int         scale      = 2;
     bool        throttle   = false;
+    bool        debug_pty  = false;
+    bool        percom     = true;
+    std::string type_text;
+    int         type_at    = 900;
     int         ei_cfg     = 2;   // 48K by default
 
     for (int i = 1; i < argc; i++) {
@@ -143,6 +309,10 @@ int main(int argc, char** argv)
         else if (a == "--wp3") { disk_wp[3] = true; }
         else if ((v = arg_value(a, "--scale=")) != "") { scale = atoi(v.c_str()); }
         else if (a == "--throttle") { throttle = true; }
+        else if (a == "--debug-pty") { debug_pty = true; }
+        else if (a == "--no-percom") { percom = false; }
+        else if ((v = arg_value(a, "--type=")) != "") { type_text = v; }
+        else if ((v = arg_value(a, "--type-at=")) != "") { type_at = atoi(v.c_str()); }
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
@@ -168,6 +338,10 @@ int main(int argc, char** argv)
     EmuDisk     disk(disk_paths, disk_wp);
     EmuKeyboard kbd;
     EmuDisplay  disp(scale);
+    DebugPty    dbg;
+    if (debug_pty && !dbg.open()) return 1;
+    AutoType    autotype;
+    autotype.program(type_text, type_at);
 
     // ---- Verilator model ----
     VerilatedContext ctx;
@@ -187,7 +361,7 @@ int main(int argc, char** argv)
     top.ei_ram_cfg    = (uint8_t)ei_cfg;
     top.fdc_disk      = 0;
     top.fdc_wp        = 0;
-    top.percom_en     = 1;
+    top.percom_en     = percom ? 1 : 0;
     top.trk_vld       = 0;
     top.trk_data      = 0;
     top.trk_idx       = 0;
@@ -235,9 +409,28 @@ int main(int argc, char** argv)
     bool running = true;
     while (running && !ctx.gotFinish()) {
 
+        // --- Debug link: sample the handshake pre-edge (clk still 0 and
+        // combinationally settled) — a valid/ready pair seen here transfers
+        // at the rising edge below, same contract as tb_m1_debug's host ---
+        bool    dbg_in_fire = false, dbg_out_fire = false;
+        uint8_t dbg_out_byte = 0;
+        if (dbg.enabled()) {
+            dbg_in_fire  = top.dbg_in_valid && top.dbg_in_ready;
+            dbg_out_fire = top.dbg_out_valid && top.dbg_out_ready;
+            dbg_out_byte = top.dbg_out_data;
+        }
+
         // --- Rising edge ---
         top.clk = 1;
         top.eval();
+
+        // --- Debug link: complete transfers, present the next byte ---
+        if (dbg.enabled()) {
+            if (dbg_in_fire)  dbg.rx_pop();
+            if (dbg_out_fire) dbg.tx_push(dbg_out_byte);
+            top.dbg_in_valid = dbg.rx_pending() ? 1 : 0;
+            top.dbg_in_data  = dbg.rx_pending() ? dbg.rx_front() : 0;
+        }
 
         // --- Feed disk model inputs (from m1_core outputs) ---
         disk.trk_req        = top.trk_req;
@@ -261,8 +454,8 @@ int main(int argc, char** argv)
         top.trk_wb_done  = disk.trk_wb_done;
         top.trk_wb_err   = disk.trk_wb_err;
 
-        // --- Update keyboard matrix ---
-        top.keys = kbd.keys();
+        // --- Update keyboard matrix (live keyboard + scripted input) ---
+        top.keys = kbd.keys() | autotype.keys();
 
         // --- Capture video dot ---
         disp.write_pixel(top.pixel, (uint8_t)top.col,
@@ -277,6 +470,12 @@ int main(int argc, char** argv)
         if (!prev_vdrv && top.vdrv) {
             disp.present();
             running = disp.poll_events(&kbd);
+            autotype.frame();
+            static uint64_t framecnt = 0;
+            if ((++framecnt % 60) == 0)
+                disp.set_frame(framecnt);
+            if (dbg.enabled())
+                dbg.service();
         }
         prev_vdrv = top.vdrv;
 

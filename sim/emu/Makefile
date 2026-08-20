@@ -41,7 +41,10 @@ CORE_RTL := ../../rtl/m1_core.v $(RTL) $(CPU_RTL) \
             ../../rtl/m1_io.v ../../rtl/m1_keyboard.v
 
 # Verilator flags for the emulator build (--exe: C++ main, no --binary)
+# FONT_HEX defaults to a path relative to sim/ (the testbench cwd); the
+# emulator binary can be started from anywhere, so bake in the absolute path.
 VFLAGS := --exe --cc --timing -Wall +define+TV80_REFRESH \
+          -GFONT_HEX='"$(abspath ../../rtl/mcm6670_cg1.hex)"' \
           --build -j 0 \
           --Mdir build/emu
 

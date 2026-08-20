@@ -73,6 +73,28 @@ drives 0–3 only; drive numbers above 3 do not exist.
 | `--no-ei` | off | 16K machine (no Expansion Interface or FDC) |
 | `--ei16` | off | 32K machine |
 | `--ei32` | **default** | 48K machine (full Expansion Interface) |
+| `--debug-pty` | off | Expose the `m1_debug` binary-v0 link on a pseudo-tty |
+
+## Debugging with DeZog (`--debug-pty`)
+
+The emulator build includes the full debug core (`m1_debug`, ADR-0006).
+With `--debug-pty` its binary-v0 byte stream is exposed on a pseudo-tty —
+the emulator-side stand-in for the board's FTDI serial port. The slave
+path is printed at startup:
+
+```
+emu_debug: binary-v0 debug link on /dev/ttys012
+```
+
+Point the unchanged reference bridge at it:
+
+```
+python3 tools/trszog_bridge.py --serial /dev/ttys012
+```
+
+and attach DeZog/trszog exactly as for the physical board (ADR-0007's
+`revz` remote; the baud rate is meaningless on a pty). Same protocol,
+same bridge, same launch.json — only the device path differs.
 
 ## Keyboard mapping
 
@@ -97,3 +119,15 @@ position-faithful.
 
 Keys with no Model I equivalent (`^`, `_`, `[`, `]`, `\`) are silently
 ignored.
+
+The matrix is rebuilt from the complete SDL keyboard state once per
+frame ("current report wins" — the same architecture as
+`m1_hid_keys.v`), so shift-translated chords cannot leave stuck keys
+behind, regardless of release order.
+
+## Backlog / ideas
+
+- **CRT bezel skin.** Project the 384×192 frame into a photographed
+  TRS-80 Model 1 monitor, with barrel distortion like a real tube. Two
+  skins: the original grey monitor (white phosphor, red power key) and
+  the later revision (green phosphor, bezel, three front knobs).

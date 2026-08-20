@@ -1,8 +1,12 @@
 // TRS-80 Rev Z — emulator keyboard model
 //
-// Translates SDL2 key events into the 64-bit TRS-80 keyboard matrix that
-// m1_core expects on its `keys[63:0]` input. The mapping mirrors
-// boards/ulx3s/rtl/m1_hid_keys.v (glyph-faithful, not position-faithful).
+// Produces the 64-bit TRS-80 keyboard matrix that m1_core expects on its
+// `keys[63:0]` input. The mapping mirrors boards/ulx3s/rtl/m1_hid_keys.v
+// (glyph-faithful, not position-faithful) — including its architecture:
+// the matrix is rebuilt from the complete current keyboard state on every
+// update ("current report wins"), never patched incrementally per event.
+// SDL scancodes are USB HID usage codes, so the translation table is a
+// 1:1 transcription of m1_hid_keys.v's map_key function.
 //
 // Matrix layout (keys[8*row + col]):
 //   row 0:  @ A B C D E F G
@@ -16,14 +20,15 @@
 
 #pragma once
 #include <cstdint>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 class EmuKeyboard {
 public:
     EmuKeyboard() : keys_(0) {}
 
-    // Call for every SDL_KEYDOWN / SDL_KEYUP event.
-    void handle(const SDL_Event& ev);
+    // Rebuild the matrix from SDL_GetKeyboardState. Call once per frame,
+    // after the SDL event queue has been pumped (SDL_PollEvent does that).
+    void rebuild();
 
     // Returns the current 64-bit key matrix for m1_core.keys.
     uint64_t keys() const { return keys_; }
@@ -31,12 +36,10 @@ public:
 private:
     uint64_t keys_;
 
-    void set_bit(int row, int col, bool pressed);
-
-    // Translate an SDL_Keysym to (row,col) with optional shift override.
-    // Returns false if the key has no M1 equivalent.
-    // force_shift / force_noshift modify the SHIFT row bits.
-    bool translate(const SDL_Keysym& sym,
-                   int& row, int& col,
-                   bool& force_shift, bool& force_noshift);
+    // (shift, HID scancode) -> matrix cell with optional shift override;
+    // transcribed from m1_hid_keys.v map_key. Returns false if the glyph
+    // has no Model 1 equivalent.
+    static bool map_key(bool shifted, int scancode,
+                        int& row, int& col,
+                        bool& force_on, bool& force_off);
 };

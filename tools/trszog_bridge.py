@@ -70,7 +70,13 @@ class Link:
                 self.ser.close()
         except Exception:  # noqa: BLE001
             pass
-        self.ser = serial.Serial(self.dev, self.baud, timeout=2)
+        try:
+            self.ser = serial.Serial(self.dev, self.baud, timeout=2)
+        except OSError:
+            # Pseudo-ttys (e.g. the SDL emulator's --debug-pty) reject some
+            # baud rates at the ioctl level; the rate is meaningless on a
+            # pty anyway, so retry with a rate every tty accepts.
+            self.ser = serial.Serial(self.dev, 9600, timeout=2)
         time.sleep(0.05)
         self.ser.reset_input_buffer()
         self.ser.reset_output_buffer()
