@@ -1,6 +1,16 @@
 # ADR-0007 — trszog integration: a first-class remote, not an emulator costume
 
-**Status:** proposed · 2026-07-26
+**Status:** accepted, implemented · 2026-08-22 (proposed 2026-07-26)
+
+> Implemented: trszog ships the `revz` remote type with the config schema
+> below (decision 2), the polite bridge lifecycle (decision 3), and honest
+> capabilities taken from `initialize` (hardware watchpoints → WPMEM,
+> keyboard injection → the screen view's keyboard). The capability
+> handshake and the `x-…` extension methods are specified in
+> [DEBUG-PROTOCOL.md](../DEBUG-PROTOCOL.md). Verified end to end against
+> the Verilator machine over `--debug-tcp` (transport `python` with
+> `serial: "tcp:<port>"`), including disconnect/reconnect without an
+> emulator restart.
 
 ## Context
 

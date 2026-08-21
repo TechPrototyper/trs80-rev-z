@@ -384,7 +384,13 @@ public:
                 while ((n = ::read(cfd_, buf, sizeof buf)) > 0)
                     for (ssize_t i = 0; i < n; i++)
                         if (filter_rx(buf[i])) rx_.push_back(buf[i]);
-                if (n == 0) { close(cfd_); cfd_ = -1; }   // client gone
+                if (n == 0) {                             // client gone:
+                    close(cfd_); cfd_ = -1;
+                    tx_.clear();          // stale responses would garble the
+                    fstate_ = F_CMD;      // next client's first exchange; rx_
+                                          // stays (the core still consumes a
+                                          // half-received command's bytes)
+                }
                 while (cfd_ >= 0 && !tx_.empty()) {
                     size_t chunk = 0;
                     while (chunk < sizeof buf && chunk < tx_.size())
