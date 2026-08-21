@@ -208,13 +208,20 @@ off to the bit-exact stock machine.
       run-out, step voice per head pulse; all disks spin on the shared
       motor line. Synthesized by default (struck-metal modes + case
       comb), real recordings via `--drive-sounds=<dir>`
-      (maintainer's trs80-drivesounds corpus plugs in directly);
-      `--click-pitch` tunes the arm. *Verified: TRSDOS boot/DIR energy
-      profile; final voicing session pending (task list).*
-- [X] Monitor skins: `--skin=grey` (first series, P4 white, red power
-      key) and `--skin=green` (dark bezel, three knobs, P1 green),
-      procedurally drawn, picture bent over a CRT vertex grid.
-      *Verified by rendered shots (`--shot`).*
+      (the name list also covers trs80gp's Resources directory, so
+      `--drive-sounds=/Applications/trs80gp.app/Contents/Resources`
+      plays George Phillips' reference recordings straight from the
+      user's own install — measured: broadband 355–830 Hz spindle with
+      5 Hz rotation wow, 61 ms step clack at 0.9–1.4 kHz — plus a
+      spin-up whirr one-shot); `--click-pitch` tunes the arm.
+      *Verified: offline render's hum spectrum matches the reference
+      peaks (513/631/670/828 Hz); final voicing session pending.*
+- [X] Monitor skins: `--skin=grey` and `--skin=green`, photographic
+      bezels of the real Tandy Video Display (CC-licensed Wikimedia
+      Commons photos, cropped/retouched — see CREDITS.md; procedural
+      drawing remains as fallback), picture bent over a gently
+      outward-bulging CRT vertex grid. *Verified by rendered shots
+      (`--shot`).*
 - [ ] Board side of the drive sounds (audio_r channel) and the
       emulator's insert/eject/door sounds — the latter need runtime
       media swaps, i.e. the companion UI.

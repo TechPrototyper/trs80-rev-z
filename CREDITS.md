@@ -37,6 +37,22 @@ DAM analysis, xtrs) · **Ira Goldklang** (trs-80.com archive) · **Matthew Reed*
 - **Thomas Gutmeier** ([8bit-Homecomputermuseum](http://www.8bit-homecomputermuseum.at/computer/tandy_trs80_model1.html), Wien) — photograph of the TRS-80 Model I system (`assets/trs80_model1.jpeg`). Many thanks to Thomas for his excellent online collection and for sharing this photograph. Thomas' photo actually looks almost identical to my own machine in
 the days, which was sold, unfortunately, because we still had and kept the Model III, which btw still exists but needs repairing.
 - **Radiona.org / Goran Mahovlić / Intergalaktik** — annotated diagram of the ULX3S FPGA board (`assets/ulx3s_diagram.jpg`), released under Open Hardware terms (CERN OHL / CC-BY-SA) via Radiona and Crowd Supply.
+- **Jason Scott** — frontal photograph of the Radio Shack TRS-80 Video Display,
+  ["TRS-80 model 1" (Flickr, via Wikimedia Commons)](https://commons.wikimedia.org/wiki/File:TRS-80_model_1_(17348455071).jpg),
+  **CC BY 2.0**. Cropped to the monitor front and the lit test pattern retouched
+  to an unpowered tube for the emulator's grey skin (`assets/skin_grey.jpg`).
+- **Flominator / ProhibitOnions** — photograph of a TRS-80 Model I system at the
+  Rechnermuseum der FH Furtwangen,
+  ["TRS-80 Model I - Rechnermuseum Cropped" (Wikimedia Commons)](https://commons.wikimedia.org/wiki/File:TRS-80_Model_I_-_Rechnermuseum_Cropped.jpg),
+  **CC BY-SA 3.0**. Cropped to the monitor front for the emulator's green skin
+  (`assets/skin_green.jpg`, itself CC BY-SA 3.0 as a derivative).
+- **Sean Barrett (nothings)** — `stb_image.h` v2.30, single-header image decoder
+  (public domain / MIT dual license), vendored unmodified as
+  `sim/emu/third_party/stb_image.h` to load the JPEG skin assets.
+- **George Phillips** — the emulator can play trs80gp's drive-sound recordings
+  (`loaded-spin.wav`, `motor.wav`, `step.wav`) directly from the user's own
+  trs80gp installation via `--drive-sounds`; the files are loaded in place at
+  runtime and are not part of this repository.
 
 The golden-model verification methodology (byte-exact VRAM comparison, simulation before
 silicon) was developed in a predecessor Space Invaders project against trs80gp.

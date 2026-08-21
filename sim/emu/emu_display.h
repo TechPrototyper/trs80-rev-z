@@ -86,6 +86,13 @@ private:
 
     std::string shot_path_;
 
+    // photo bezel (assets/skin_grey.jpg / skin_green.jpg): real Tandy
+    // monitor photographs; the procedural drawing is only the fallback
+    std::vector<uint32_t> photo_px_;
+    int  photo_w_ = 0, photo_h_ = 0;
+    bool photo_ok_ = false;
+
+    bool load_photo();
     void build_bezel();
     void build_grid(float cx, float cy, float rx, float ry);
 };

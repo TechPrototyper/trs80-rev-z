@@ -11,6 +11,14 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include <string>
+
+// Vendored public-domain JPEG/PNG decoder (SDL2 core only loads BMP);
+// see third_party/stb_image.h for its own license block and CREDITS.md.
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_JPEG
+#define STBI_ONLY_PNG
+#include "third_party/stb_image.h"
 
 // ---------------------------------------------------------------------------
 // Procedural bezel painting helpers (ARGB, CPU-side, once at startup)
@@ -84,8 +92,11 @@ EmuDisplay::EmuDisplay(int scale, bool hidden, Skin skin)
     if (skin_ == Skin::NONE) {
         winw_ = W * scale_;
         winh_ = H * scale_;
+    } else if (load_photo()) {
+        winw_ = photo_w_;                  // window adopts the photo
+        winh_ = photo_h_;
     } else {
-        winw_ = 1040;
+        winw_ = 1040;                      // procedural fallback layout
         winh_ = 800;
     }
 
@@ -116,18 +127,81 @@ EmuDisplay::EmuDisplay(int scale, bool hidden, Skin skin)
         phosphor_ = (skin_ == Skin::GREEN) ? 0xFF7CFF9C   // P1 green
                                            : 0xFFE9EFFF;  // P4 blue-white
         build_bezel();
-        // tube picture area (must match the cutout in build_bezel)
-        build_grid(520.0f, 356.0f, 348.0f, 238.0f);
+        // tube picture area: measured on the photo's glass (or, in the
+        // fallback, matching the procedural cutout)
+        if (photo_ok_ && skin_ == Skin::GREY)
+            build_grid(452.0f, 315.0f, 292.0f, 232.0f);
+        else if (photo_ok_)
+            build_grid(381.0f, 303.0f, 258.0f, 200.0f);
+        else
+            build_grid(520.0f, 356.0f, 348.0f, 238.0f);
     }
 
     memset(fb_, 0, sizeof(fb_));
 }
 
-// Paint the monitor front once. Layout (1040x800):
-//   case body with rounded corners, darker front panel, black tube
-//   cutout around the picture, controls at the bottom.
+// Load the photographic monitor front for the chosen skin.
+// assets/skin_grey.jpg: Tandy Video Display, cropped from "TRS-80
+// model 1" by Jason Scott (Wikimedia Commons, CC BY 2.0), lit test
+// pattern retouched to an unpowered tube. assets/skin_green.jpg:
+// cropped from "TRS-80 Model I - Rechnermuseum" by Flominator/
+// ProhibitOnions (Wikimedia Commons, CC BY-SA 3.0). Full provenance
+// in CREDITS.md.
+bool EmuDisplay::load_photo()
+{
+    const char* name = (skin_ == Skin::GREY) ? "skin_grey.jpg"
+                                             : "skin_green.jpg";
+    std::vector<std::string> dirs = {"assets/", "../assets/",
+                                     "../../assets/", "../../../assets/",
+                                     "../../../../assets/"};
+    if (char* base = SDL_GetBasePath()) {
+        std::string b(base);
+        SDL_free(base);
+        for (auto rel : {"assets/", "../../assets/", "../../../assets/",
+                         "../../../../assets/"})
+            dirs.push_back(b + rel);
+    }
+    for (const auto& d : dirs) {
+        std::string path = d + name;
+        int w = 0, h = 0, comp = 0;
+        unsigned char* img = stbi_load(path.c_str(), &w, &h, &comp, 4);
+        if (!img)
+            continue;
+        photo_px_.resize((size_t)w * h);
+        for (size_t i = 0; i < (size_t)w * h; i++) {
+            const unsigned char* p = img + i * 4;
+            photo_px_[i] = 0xFF000000u | ((uint32_t)p[0] << 16)
+                         | ((uint32_t)p[1] << 8) | (uint32_t)p[2];
+        }
+        stbi_image_free(img);
+        photo_w_ = w;
+        photo_h_ = h;
+        photo_ok_ = true;
+        fprintf(stderr, "emu_display: photo bezel %s (%dx%d)\n",
+                path.c_str(), w, h);
+        return true;
+    }
+    fprintf(stderr,
+            "emu_display: no photo bezel found (%s) — procedural front\n",
+            name);
+    return false;
+}
+
+// Paint the monitor front once: the photo when one was found, else the
+// procedural drawing. Fallback layout (1040x800): case body with
+// rounded corners, darker front panel, black tube cutout around the
+// picture, controls at the bottom.
 void EmuDisplay::build_bezel()
 {
+    if (photo_ok_) {
+        bezel_ = SDL_CreateTexture(ren_, SDL_PIXELFORMAT_ARGB8888,
+                                   SDL_TEXTUREACCESS_STATIC,
+                                   photo_w_, photo_h_);
+        SDL_UpdateTexture(bezel_, nullptr, photo_px_.data(),
+                          photo_w_ * (int)sizeof(uint32_t));
+        return;
+    }
+
     Canvas c(winw_, winh_);
 
     if (skin_ == Skin::GREY) {
