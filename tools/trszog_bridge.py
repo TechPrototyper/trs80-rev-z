@@ -37,6 +37,15 @@ class TcpSerial:
         self._socket = socket
         self.sock = socket.create_connection(("127.0.0.1", port))
         self.sock.settimeout(2)
+        self.is_open = True            # serial.Serial interface
+
+    @property
+    def in_waiting(self):
+        """serial.Serial interface: >0 when a byte can be read without
+        blocking. select() peeks without consuming."""
+        import select
+        r, _, _ = select.select([self.sock], [], [], 0)
+        return 1 if r else 0
 
     def read(self, n=1):
         try:
@@ -62,6 +71,7 @@ class TcpSerial:
         pass
 
     def close(self):
+        self.is_open = False
         self.sock.close()
 
 
