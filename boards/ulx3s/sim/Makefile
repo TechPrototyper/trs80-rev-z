@@ -40,7 +40,7 @@ CORE_RTL  := ../../../rtl/m1_core.v ../../../rtl/m1_cpu_clock.v \
 
 all: run
 
-run: build/tb_tmds/Vtb_tmds build/tb_scan_fb/Vtb_scan_fb build/tb_hid_keys/Vtb_hid_keys build/tb_selftest/Vtb_selftest build/tb_dbg_uart/Vtb_dbg_uart build/tb_sd_loader/Vtb_sd_loader build/tb_sd_fs/Vtb_sd_fs build/tb_dmk_fetch/Vtb_dmk_fetch build/fat_pattern.hex build/fat_boot.hex build/fat_nofile.hex build/fat_drives.hex build/fat_dmk.hex
+run: build/tb_tmds/Vtb_tmds build/tb_scan_fb/Vtb_scan_fb build/tb_hid_keys/Vtb_hid_keys build/tb_selftest/Vtb_selftest build/tb_dbg_uart/Vtb_dbg_uart build/tb_sd_loader/Vtb_sd_loader build/tb_sd_fs/Vtb_sd_fs build/tb_dmk_fetch/Vtb_dmk_fetch build/tb_cass_sd/Vtb_cass_sd build/fat_pattern.hex build/fat_boot.hex build/fat_nofile.hex build/fat_drives.hex build/fat_dmk.hex build/fat_cass.hex
 	@set -e; for tb in tb_tmds tb_scan_fb tb_hid_keys tb_selftest tb_dbg_uart; do \
 	  echo "=== $$tb ==="; build/$$tb/V$$tb; \
 	done
@@ -65,7 +65,9 @@ run: build/tb_tmds/Vtb_tmds build/tb_scan_fb/Vtb_scan_fb build/tb_hid_keys/Vtb_h
 	echo "=== tb_sd_fs (no images: all unmounted) ==="; \
 	build/tb_sd_fs/Vtb_sd_fs +mode=none +img=build/fat_nofile.hex; \
 	echo "=== tb_dmk_fetch (tracks off the FAT-mounted DMK) ==="; \
-	build/tb_dmk_fetch/Vtb_dmk_fetch +img=build/fat_dmk.hex +dmk=../../../sim/build/fdc_disk.hex
+	build/tb_dmk_fetch/Vtb_dmk_fetch +img=build/fat_dmk.hex +dmk=../../../sim/build/fdc_disk.hex; \
+	echo "=== tb_cass_sd (SD cassette deck: play, rewind, record) ==="; \
+	build/tb_cass_sd/Vtb_cass_sd +img=build/fat_cass.hex +cas=build/fat_cass.cas.hex +clen=8
 
 # FAT32 card images for the SD loader bench (simulation tooling; the
 # "boot" payload is the repository's own test image, never a Tandy ROM)
@@ -95,6 +97,12 @@ build/tb_sd_loader/Vtb_sd_loader: tb_sd_loader.sv sd_card_model.sv ../rtl/m1_sd_
 	  ../rtl/m1_sd_fs.v ../rtl/sd_spi_host.v \
 	  ../rtl/m1_selftest_loader.v $(CORE_RTL)
 
+# FAT card with the cassette slots: an 8-byte tape + a CASSOUT target
+build/fat_cass.hex: tools/build_fat32.py
+	@mkdir -p build
+	$(PYTHON) tools/build_fat32.py --out build/fat_cass --pattern 512 \
+	  --cassette 8 --cassout 4096
+
 # FAT card carrying the core generator's DMK in DRIVE1 (stage 3)
 build/fat_dmk.hex: tools/build_fat32.py ../../../sim/build/fdc_disk.hex
 	@mkdir -p build
@@ -109,6 +117,13 @@ build/tb_dmk_fetch/Vtb_dmk_fetch: tb_dmk_fetch.sv sd_card_model.sv ../rtl/m1_sd_
 	$(VERILATOR) $(VFLAGS) --Mdir build/tb_dmk_fetch -o Vtb_dmk_fetch \
 	  --top-module tb_dmk_fetch tb_dmk_fetch.sv sd_card_model.sv \
 	  ../rtl/m1_sd_fs.v ../rtl/sd_spi_host.v ../rtl/m1_dmk_fetch.v
+
+build/tb_cass_sd/Vtb_cass_sd: tb_cass_sd.sv sd_card_model.sv ../rtl/m1_sd_fs.v ../rtl/sd_spi_host.v ../rtl/m1_sd_arb.v ../rtl/m1_cass_sd.v
+	@mkdir -p build/tb_cass_sd
+	$(VERILATOR) $(VFLAGS) --Mdir build/tb_cass_sd -o Vtb_cass_sd \
+	  --top-module tb_cass_sd tb_cass_sd.sv sd_card_model.sv \
+	  ../rtl/m1_sd_fs.v ../rtl/sd_spi_host.v \
+	  ../rtl/m1_sd_arb.v ../rtl/m1_cass_sd.v
 
 build/tb_sd_fs/Vtb_sd_fs: tb_sd_fs.sv sd_card_model.sv ../rtl/m1_sd_fs.v ../rtl/sd_spi_host.v
 	@mkdir -p build/tb_sd_fs

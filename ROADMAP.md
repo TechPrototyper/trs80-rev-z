@@ -31,9 +31,16 @@ trs80gp), `cd boards/ulx3s && make bit` for the bitstream. If your run
 disagrees with a checkmark, please open an issue — the checkmark is wrong
 until proven otherwise.
 
-**Next up, in that order:** finish Cassette (M2 — the last gap in the base
-machine), then RS-232-C (M5), then Centronics (M6). See below for what
-"finish" means precisely for each.
+**Next up, in that order:** RS-232-C (M5), then Centronics (M6) — M2
+(Cassette) closed on 2026-08-21 with the read/write paths golden-pinned
+against trs80gp, the CSAVE/CLOAD round trip byte-exact through WAV, Space
+Invaders loading from the assembly corpus via `SYSTEM`, and the SD deck
+(`TRS80/CASSETTE/`, `CASSOUT.CAS`) simulation-verified on the board side
+(hardware smoke test pending). Along the way the machine grew double-sided
+disk support (drive-select bit 3, golden-verified; nd80206 boots) and two
+WD1771 fixes NEWDOS/80 depends on (Type I status after an idle forced
+interrupt; a gap-II floor before the data phase). See below for what
+"finish" means precisely for each milestone.
 
 ---
 
@@ -107,10 +114,19 @@ VRAM comparison against trs80gp, then on the ULX3S over HDMI with a USB keyboard
 
 ### M2 — Cassette
 
-- [ ] Cassette interface per schematic (Z4 filter/rectifier/level-detector →
+- [X] Cassette interface per schematic (Z4 filter/rectifier/level-detector →
       cassette-input edges; the 2-bit output ladder into R53–R56 + motor
       relay consumer — the open items from
-      [chapter 6](docs/chapters/06-io-ports.md)); `.cas`/WAV on the SD card
+      [chapter 6](docs/chapters/06-io-ports.md)); `.cas`/WAV on the SD card.
+      *Z4 modeled in the media layer (where the analog half lives);
+      register side chapter 6. SD deck 2026-08-21: `m1_cass_sd` plays
+      `TRS80/CASSETTE/*.CAS` (fs slot 4) and records to the pre-allocated
+      `TRS80/CASSOUT.CAS` (slot 5, in-place — the FAT is never touched)
+      through the new `m1_sd_arb`; simulation-verified end to end over
+      the bit-true SPI card model (`boards/ulx3s/sim tb_cass_sd`: mounts,
+      byte-exact play, freeze-pause, end-of-tape rewind, record + pad).
+      WAV stays a host-side format (`sim/emu --cas=`), by design — .cas
+      is the archival format on the card. Hardware smoke test pending.*
 - [X] Machine-language round-trip: the existing assembly-language WAV corpus
       loads correctly (read path only — these files already exist).
       *Verified 2026-08-21: `make golden-cass` (probe ROM + the same .cas in
@@ -208,7 +224,21 @@ down so the direction is public — not because I know when, or whether, I'll ge
 
 
 - **Audio.** Floppy Drive seek/spindle and keyboard sounds, each with on/off toggles —
- the machine you *hear*.
+ the machine you *hear*. Plus the cassette ladder on the ULX3S audio DAC:
+ record a REAL tape from the FPGA (or feed a real Model 1), 1978-style.
+- **Companion UI (ESP32, ADR-0008).** The microcontroller as the machine's
+  front desk: settings (expansions on/off, ROM selection), inserting and
+  ejecting disks/tapes at runtime, sound options. The SDL emulator will
+  want the same functions — either as a native menu or by emulating the
+  companion's role.
+- **Card access over WLAN (ESP32).** The SD card shared to the network —
+  SFTP preferred (the way a web server carries HTTPS), FTPS/FTP as the
+  fallback; NFS rejected as too complex. Needs the SD-bus handover
+  ESP32↔FPGA thought through first.
+- **Emulator quality-of-life.** The CRT bezel skin (grey monitor first,
+  the green three-knob revision later) and the push from ~0.75× to true
+  realtime for the cycle-true Verilator emulator (profiled: the model
+  eval itself dominates; see task notes).
 - **Virtual expansion-card bus.** The Model 1 edge connector as an internal, arbitrated
   bus with virtual "slots" — the Apple II/IBM-PC idea the TRS-80 never got, though the
   aftermarket built bus splitters that pointed exactly this way. Research on historical

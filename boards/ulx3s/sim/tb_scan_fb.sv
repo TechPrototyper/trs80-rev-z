@@ -52,7 +52,7 @@ module tb_scan_fb;
         .ei_ram_cfg(2'b00),   // no EI RAM: 16K system, goldens unchanged
         .fdc_disk(4'b0000),
         /* verilator lint_off PINCONNECTEMPTY */
-        .trk_req(), .trk_drv(), .trk_track(),
+        .trk_req(), .trk_drv(), .trk_track(), .trk_side(),
         /* verilator lint_on PINCONNECTEMPTY */
         .trk_vld(1'b0), .trk_data(8'd0), .trk_idx(13'd0),
         .trk_done(1'b0), .trk_err(1'b1), .trk_len(13'd0), .trk_dbl(1'b0),

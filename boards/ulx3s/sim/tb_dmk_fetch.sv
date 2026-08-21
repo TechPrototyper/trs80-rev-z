@@ -26,11 +26,12 @@ module tb_dmk_fetch;
     wire sd_sck, sd_mosi, sd_cs_n, card_miso;
 
     wire        fs_ready, rq_vld, rq_done, rq_err;
-    wire [3:0]  drv_mounted;
+    wire [5:0]  drv_mounted;
     wire [7:0]  rq_dat;
     wire [8:0]  rq_idx;
     wire        rq_req;
-    wire [1:0]  rq_drv;
+    wire [2:0]  rq_drv;
+    wire [1:0]  rq_drv2;
     wire [12:0] rq_fsec;
 
     m1_sd_fs #(.HALF_INIT(8'd4), .HALF_FAST(8'd1)) u_fs (
@@ -43,6 +44,9 @@ module tb_dmk_fetch;
         .loading(), .sys_ready(), .ok(), .err(), .init_err(),
         /* verilator lint_on PINCONNECTEMPTY */
         .drv_mounted(drv_mounted), .fs_ready(fs_ready),
+        /* verilator lint_off PINCONNECTEMPTY */
+        .cas_len(),
+        /* verilator lint_on PINCONNECTEMPTY */
         .rq_req(rq_req), .rq_drv(rq_drv), .rq_fsec(rq_fsec),
         .rq_vld(rq_vld), .rq_dat(rq_dat), .rq_idx(rq_idx),
         .rq_done(rq_done), .rq_err(rq_err),
@@ -69,7 +73,8 @@ module tb_dmk_fetch;
     logic [7:0]  trk_wb_data;
     wire  [3:0]  drv_wp;
     wire         wq_req, wq_fetch, wq_done, wq_err;
-    wire  [1:0]  wq_drv;
+    wire  [1:0]  wq_drv2;
+    wire  [2:0]  wq_drv;
     wire  [12:0] wq_fsec;
     wire  [8:0]  wq_idx;
     wire  [7:0]  wq_dat;
@@ -83,16 +88,20 @@ module tb_dmk_fetch;
         trk_wb_data <= ref_dmk[int'(wb_base) + int'(wbf_idx_d)] ^ 8'h5A;
     end
 
+    assign rq_drv = {1'b0, rq_drv2};
+    assign wq_drv = {1'b0, wq_drv2};
+
     m1_dmk_fetch u_fetch (
         .clk(clk), .rst_n(rst_n),
-        .fs_ready(fs_ready), .drv_mounted(drv_mounted),
-        .rq_req(rq_req), .rq_drv(rq_drv), .rq_fsec(rq_fsec),
+        .fs_ready(fs_ready), .drv_mounted(drv_mounted[3:0]),
+        .rq_req(rq_req), .rq_drv(rq_drv2), .rq_fsec(rq_fsec),
         .rq_vld(rq_vld), .rq_dat(rq_dat), .rq_idx(rq_idx),
         .rq_done(rq_done), .rq_err(rq_err),
-        .wq_req(wq_req), .wq_drv(wq_drv), .wq_fsec(wq_fsec),
+        .wq_req(wq_req), .wq_drv(wq_drv2), .wq_fsec(wq_fsec),
         .wq_fetch(wq_fetch), .wq_idx(wq_idx), .wq_dat(wq_dat),
         .wq_done(wq_done), .wq_err(wq_err),
         .trk_req(trk_req), .trk_drv(trk_drv), .trk_track(trk_track),
+        .trk_side(1'b0),
         .trk_vld(trk_vld), .trk_data(trk_data), .trk_idx(trk_idx),
         .trk_done(trk_done), .trk_err(trk_err),
         .trk_len(trk_len), .trk_dbl(trk_dbl), .drv_wp(drv_wp),
@@ -199,8 +208,8 @@ module tb_dmk_fetch;
         // give the header snapshot pass time to finish
         repeat (400_000) @(negedge clk);
 
-        if (drv_mounted !== 4'b0010) begin
-            $display("FAIL  mounts %b, expected 0010", drv_mounted);
+        if (drv_mounted[3:0] !== 4'b0010) begin
+            $display("FAIL  mounts %b, expected 0010", drv_mounted[3:0]);
             errors++;
         end else
             $display("  ok  DRIVE1 mounted");

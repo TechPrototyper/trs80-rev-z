@@ -6,6 +6,7 @@ read_verilog -DTV80_REFRESH -sv \
   rtl/m1_scan_fb.v rtl/dvi_800x600.v rtl/tmds_encoder.v rtl/dvi_serializer.v \
   rtl/m1_hid_keys.v rtl/m1_selftest_loader.v rtl/dbg_uart.v \
   rtl/m1_sd_fs.v rtl/sd_spi_host.v rtl/m1_dmk_fetch.v \
+  rtl/m1_sd_arb.v rtl/m1_cass_sd.v \
   vendor/usb_hid_host/usb_hid_host.v vendor/usb_hid_host/usb_hid_host_rom.v \
   ../../rtl/m1_core.v ../../rtl/m1_cpu_clock.v ../../rtl/m1_video_timing.v \
   ../../rtl/m1_video_gen.v ../../rtl/m1_vram.v ../../rtl/m1_addr_decode.v \

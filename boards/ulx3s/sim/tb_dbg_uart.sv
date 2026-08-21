@@ -45,7 +45,7 @@ module tb_dbg_uart;
         .keys('0),
         .cass_in(1'b0),
         /* verilator lint_off PINCONNECTEMPTY */
-        .trk_req(), .trk_drv(), .trk_track(), .trk_wb_req(),
+        .trk_req(), .trk_drv(), .trk_track(), .trk_side(), .trk_wb_req(),
         .trk_wb_data(),
         .cass_out(), .cass_motor(), .hdrv(), .vdrv(), .dot_en(),
         .cpu_cen(), .modesel(), .addr(), .m1_n(), .halt_n(),

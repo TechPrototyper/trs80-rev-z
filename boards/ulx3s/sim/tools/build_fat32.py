@@ -137,6 +137,26 @@ def build(args):
             nc = max(1, -(-len(drv_payload[n]) // bytes_per_clus))
             drv_chain[n] = chainify(take(nc), frag)
 
+    # cassette slots (M2): TRS80/CASSETTE/TAPE.CAS + TRS80/CASSOUT.CAS
+    cass_dir_clus = None
+    cass_chain = []
+    cass_payload = b""
+    casout_chain = []
+    casout_size = 0
+    if args.cassette is not None:
+        cass_dir_clus = take(1)[0]
+        if args.cassette.startswith("@"):
+            with open(args.cassette[1:], "rb") as fh:
+                cass_payload = fh.read()
+        else:
+            cass_payload = pattern_bytes(int(args.cassette), seed=77)
+        nc = max(1, -(-len(cass_payload) // bytes_per_clus))
+        cass_chain = chainify(take(nc), args.fragment)
+    if args.cassout:
+        casout_size = args.cassout
+        nc = max(1, -(-casout_size // bytes_per_clus))
+        casout_chain = take(nc)
+
     nclusters = alloc[0] - 2 + 8         # small slack
     totsec = rsvd + nfats * fatsz + nclusters * spc
 
@@ -216,6 +236,11 @@ def build(args):
         fset(drv_dir_clus[n], EOC)
         if n in drv_chain:
             fchain(drv_chain[n])
+    if cass_dir_clus is not None:
+        fset(cass_dir_clus, EOC)
+        fchain(cass_chain)
+    if casout_chain:
+        fchain(casout_chain)
     for k in range(nfats):
         wr(part + rsvd + k * fatsz, fat)
 
@@ -253,6 +278,16 @@ def build(args):
         sub[pos:pos + 32] = lfn_entries(f"drive{n}", name11)
         sub[pos + 32:pos + 64] = sfn_entry(name11, 0x10, drv_dir_clus[n], 0)
         pos += 64
+    if cass_dir_clus is not None:
+        sub[pos:pos + 32] = lfn_entries("cassette", "CASSETTE   ")
+        sub[pos + 32:pos + 64] = sfn_entry("CASSETTE   ", 0x10,
+                                           cass_dir_clus, 0)
+        pos += 64
+    if casout_chain:
+        sub[pos:pos + 32] = lfn_entries("cassout.cas", "CASSOUT CAS")
+        sub[pos + 32:pos + 64] = sfn_entry("CASSOUT CAS", 0x20,
+                                           casout_chain[0], casout_size)
+        pos += 64
     wr(clus_lba(3), sub)
 
     # ---- TRS80/DRIVEn/ --------------------------------------------------
@@ -270,11 +305,28 @@ def build(args):
                                    len(drv_payload[n]))
         wr(clus_lba(drv_dir_clus[n]), d)
 
+    # ---- TRS80/CASSETTE/ ------------------------------------------------
+    if cass_dir_clus is not None:
+        d = bytearray(bytes_per_clus)
+        d[0:32] = sfn_entry(".          ", 0x10, cass_dir_clus, 0)
+        d[32:64] = sfn_entry("..         ", 0x10, 3, 0)
+        # decoy ahead of the tape: the extension match must skip it
+        d[64:96] = lfn_entries("notes.txt", "NOTES   TXT")
+        d[96:128] = sfn_entry("NOTES   TXT", 0x20, 0, 0)
+        d[128:160] = lfn_entries("tape.cas", "TAPE    CAS")
+        d[160:192] = sfn_entry("TAPE    CAS", 0x20, cass_chain[0],
+                               len(cass_payload))
+        wr(clus_lba(cass_dir_clus), d)
+
     # ---- file payloads along their (possibly fragmented) chains ---------
     if rom_chain:
         wr_file(rom_chain, payload)
     for n in drv_chain:
         wr_file(drv_chain[n], drv_payload[n])
+    if cass_chain:
+        wr_file(cass_chain, cass_payload)
+    if casout_chain:
+        wr_file(casout_chain, bytes(casout_size))
 
     with open(args.out + ".hex", "w") as f:
         f.write("\n".join(f"{b:02x}" for b in img) + "\n")
@@ -283,6 +335,9 @@ def build(args):
     for n in drv_payload:
         with open(f"{args.out}.d{n}.hex", "w") as f:
             f.write("\n".join(f"{b:02x}" for b in drv_payload[n]) + "\n")
+    if cass_payload:
+        with open(f"{args.out}.cas.hex", "w") as f:
+            f.write("\n".join(f"{b:02x}" for b in cass_payload) + "\n")
 
     dinfo = {n: (drv_chain.get(n), drives[n][0]) for n in sorted(drives)}
     print(f"{args.out}.hex: {len(img)//SEC} sectors, part@{part}, spc={spc}, "
@@ -310,6 +365,11 @@ def main():
                     help="add TRS80/DRIVEN/ with DISKN.DMK of SIZE pattern "
                          "bytes, N:@file = real file content, N:empty = "
                          "directory with only the decoy")
+    ap.add_argument("--cassette", metavar="SIZE|@file",
+                    help="add TRS80/CASSETTE/TAPE.CAS (slot 4) with SIZE "
+                         "pattern bytes or a real file's content")
+    ap.add_argument("--cassout", type=int, metavar="SIZE",
+                    help="add a zero-filled TRS80/CASSOUT.CAS (slot 5)")
     args = ap.parse_args()
     build(args)
 

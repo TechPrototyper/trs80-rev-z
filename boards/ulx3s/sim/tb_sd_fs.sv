@@ -51,14 +51,14 @@ module tb_sd_fs;
     wire        sd_sck, sd_mosi, sd_cs_n, card_miso;
 
     logic       rq_req;
-    logic [1:0] rq_drv;
+    logic [2:0] rq_drv;
     logic [12:0] rq_fsec;
     wire        rq_vld, rq_done, rq_err;
     wire [7:0]  rq_dat;
     wire [8:0]  rq_idx;
 
     logic        wq_req;
-    logic [1:0]  wq_drv;
+    logic [2:0]  wq_drv;
     logic [12:0] wq_fsec;
     wire         wq_fetch, wq_done, wq_err;
     wire  [8:0]  wq_idx;
@@ -75,7 +75,7 @@ module tb_sd_fs;
     wire        ld_en, sd_loading, sd_ok, sd_err, fs_ready;
     wire [13:0] ld_addr;
     wire [7:0]  ld_data;
-    wire [3:0]  drv_mounted;
+    wire [5:0]  drv_mounted;
 
     m1_sd_fs #(.HALF_INIT(8'd4), .HALF_FAST(8'd1)) u_fs (
         .clk(clk), .rst_n(rst_n),
@@ -88,6 +88,9 @@ module tb_sd_fs;
         .sys_ready(), .init_err(),
         /* verilator lint_on PINCONNECTEMPTY */
         .drv_mounted(drv_mounted), .fs_ready(fs_ready),
+        /* verilator lint_off PINCONNECTEMPTY */
+        .cas_len(),
+        /* verilator lint_on PINCONNECTEMPTY */
         .rq_req(rq_req), .rq_drv(rq_drv), .rq_fsec(rq_fsec),
         .rq_vld(rq_vld), .rq_dat(rq_dat), .rq_idx(rq_idx),
         .rq_done(rq_done), .rq_err(rq_err),
@@ -142,7 +145,7 @@ module tb_sd_fs;
         got_done = 0; got_err = 0;
         @(negedge clk);
         wq_req  = 1;
-        wq_drv  = 2'(drv);
+        wq_drv  = 3'(drv);
         wq_fsec = 13'(fsec);
         @(negedge clk);
         wq_req  = 0;
@@ -156,7 +159,7 @@ module tb_sd_fs;
         got_done = 0; got_err = 0;
         @(negedge clk);
         rq_req  = 1;
-        rq_drv  = 2'(drv);
+        rq_drv  = 3'(drv);
         rq_fsec = 13'(fsec);
         @(negedge clk);
         rq_req  = 0;
@@ -231,12 +234,12 @@ module tb_sd_fs;
                     $display("FAIL  ROM flags: ok=%b err=%b", sd_ok, sd_err);
                     errors++;
                 end
-                if (drv_mounted !== 4'(mounts_exp)) begin
+                if (drv_mounted[3:0] !== 4'(mounts_exp)) begin
                     $display("FAIL  mounts %b, expected %b",
-                             drv_mounted, 4'(mounts_exp));
+                             drv_mounted[3:0], 4'(mounts_exp));
                     errors++;
                 end else
-                    $display("  ok  mount mask %b", drv_mounted);
+                    $display("  ok  mount mask %b", drv_mounted[3:0]);
 
                 // the ROM still arrived byte-exact over the ld_* seam
                 mism = 0;
@@ -302,8 +305,8 @@ module tb_sd_fs;
             end
 
             "none": begin
-                if (drv_mounted !== 4'b0000) begin
-                    $display("FAIL  mounts %b on an empty card", drv_mounted);
+                if (drv_mounted[3:0] !== 4'b0000) begin
+                    $display("FAIL  mounts %b on an empty card", drv_mounted[3:0]);
                     errors++;
                 end
                 if (!sd_err || sd_ok) begin

@@ -56,7 +56,20 @@ TRS80/
   DRIVE1/        directory is mounted (same for :1..:3); other files
   DRIVE2/        are ignored, missing directories leave the
   DRIVE3/        drive empty
+  CASSETTE/      the tape in the deck — the FIRST *.CAS is mounted and
+                 plays into the cassette input at 500 baud (M2);
+                 motor-gated, pauses in place, rewinds at end-of-tape
+  CASSOUT.CAS    recording target: everything the machine writes
+                 (CSAVE, SYSTEM tapes) is decoded and stored here
+                 IN PLACE — create the file beforehand at the size you
+                 want (e.g. 64 KiB of zeros); successive saves append
+                 until power-off
 ```
+
+Double-sided DMK images (header byte 4 bit 4 clear, two track blocks
+per cylinder) are served with the DS drive-select convention — latch
+bit 3 selects head 1, so NEWDOS/80 DS volumes like an 80-cylinder
+nd80206 boot directly.
 
 * Card: FAT32 (the out-of-the-box format of 4–32 GB cards; exFAT is not
   supported). Both factory MBR-partitioned cards and "superfloppy" cards

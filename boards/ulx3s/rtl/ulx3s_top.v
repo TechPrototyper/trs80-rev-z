@@ -24,7 +24,8 @@
 //   - video:       the authentic pixel stream is captured into a dual-clock
 //                  framebuffer (m1_scan_fb) and shown as 800x600@60 DVI on
 //                  the GPDI port — 2x3 scaling, the original tube geometry.
-//   - cassette:    cass_in tied low; cass_out/motor unused (M2).
+//   - cassette:    SD deck (m1_cass_sd): TRS80/CASSETTE/*.CAS plays
+//                  into cass_in, writes are recorded to CASSOUT.CAS.
 //
 // Board facts (ULX3S v2.x/v3.x): 25 MHz oscillator on G2; eight LEDs;
 // btn[0] is the PWR button (pull-up, pressed = 0) — left alone; btn[1]
@@ -185,7 +186,8 @@ module ulx3s_top (
     wire        sd_en, sd_loading, sd_sys_ready, sd_ok, sd_err, sd_init_err;
     wire [13:0] sd_addr;
     wire [7:0]  sd_data;
-    wire [3:0]  drv_mounted;
+    wire [5:0]  drv_mounted;         // 0-3 drives, 4 cassette in, 5 out
+    wire [31:0] cas_len;
 
     m1_sd_fs u_sd_fs (
         .clk     (clk),
@@ -209,10 +211,11 @@ module ulx3s_top (
         .rq_drv  (rq_drv),
         .rq_fsec (rq_fsec),
         .drv_mounted (drv_mounted),
+        .cas_len     (cas_len),
         .fs_ready    (fs_ready),
         .rq_vld(rq_vld), .rq_dat(rq_dat), .rq_idx(rq_idx),
         .rq_done(rq_done), .rq_err(rq_err),
-        // sector-write port: the fetcher's dirty-track write-back
+        // sector-write port: dirty-track write-back + cassette recorder
         .wq_req(wq_req), .wq_drv(wq_drv), .wq_fsec(wq_fsec),
         .wq_fetch(wq_fetch), .wq_idx(wq_idx), .wq_dat(wq_dat),
         .wq_done(wq_done), .wq_err(wq_err)
@@ -223,21 +226,42 @@ module ulx3s_top (
     // (EI stage 3). One raw DMK track per request, header-checked.
     // ------------------------------------------------------------------
     wire        fs_ready, rq_req, rq_vld, rq_done, rq_err;
-    wire [1:0]  rq_drv;
+    wire [2:0]  rq_drv;
     wire [12:0] rq_fsec;
     wire [7:0]  rq_dat;
     wire [8:0]  rq_idx;
 
-    wire        trk_req, trk_vld, trk_done, trk_err, trk_dbl;
+    wire        trk_req, trk_vld, trk_done, trk_err, trk_dbl, trk_side;
     wire [1:0]  trk_drv;
     wire [6:0]  trk_track;
     wire [7:0]  trk_data;
     wire [12:0] trk_idx, trk_len;
     wire        wq_req, wq_fetch, wq_done, wq_err;
-    wire [1:0]  wq_drv;
+    wire [2:0]  wq_drv;
     wire [12:0] wq_fsec;
     wire [8:0]  wq_idx;
     wire [7:0]  wq_dat;
+
+    // arbiter client 0 (DMK fetcher) and client 1 (cassette deck)
+    wire        c0_rq_req, c0_rq_vld, c0_rq_done, c0_rq_err;
+    wire [1:0]  c0_rq_drv;
+    wire [12:0] c0_rq_fsec;
+    wire [7:0]  c0_rq_dat;
+    wire [8:0]  c0_rq_idx;
+    wire        c0_wq_req, c0_wq_fetch, c0_wq_done, c0_wq_err;
+    wire [1:0]  c0_wq_drv;
+    wire [12:0] c0_wq_fsec;
+    wire [8:0]  c0_wq_idx;
+    wire [7:0]  c0_wq_dat;
+    wire        c1_rq_req, c1_rq_vld, c1_rq_done, c1_rq_err;
+    wire [12:0] c1_rq_fsec;
+    wire [7:0]  c1_rq_dat;
+    wire [8:0]  c1_rq_idx;
+    wire        c1_wq_req, c1_wq_fetch, c1_wq_done, c1_wq_err;
+    wire [12:0] c1_wq_fsec;
+    wire [8:0]  c1_wq_idx;
+    wire [7:0]  c1_wq_dat;
+    wire        cass_in_w;
     wire        trk_wb_req, trk_wb_fetch, trk_wb_done, trk_wb_err;
     wire [12:0] trk_wb_idx;
     wire [7:0]  trk_wb_data;
@@ -245,20 +269,69 @@ module ulx3s_top (
 
     m1_dmk_fetch u_dmk (
         .clk(clk), .rst_n(por_rst_n),
-        .fs_ready(fs_ready), .drv_mounted(drv_mounted),
-        .rq_req(rq_req), .rq_drv(rq_drv), .rq_fsec(rq_fsec),
-        .rq_vld(rq_vld), .rq_dat(rq_dat), .rq_idx(rq_idx),
-        .rq_done(rq_done), .rq_err(rq_err),
-        .wq_req(wq_req), .wq_drv(wq_drv), .wq_fsec(wq_fsec),
-        .wq_fetch(wq_fetch), .wq_idx(wq_idx), .wq_dat(wq_dat),
-        .wq_done(wq_done), .wq_err(wq_err),
+        .fs_ready(fs_ready), .drv_mounted(drv_mounted[3:0]),
+        .rq_req(c0_rq_req), .rq_drv(c0_rq_drv), .rq_fsec(c0_rq_fsec),
+        .rq_vld(c0_rq_vld), .rq_dat(c0_rq_dat), .rq_idx(c0_rq_idx),
+        .rq_done(c0_rq_done), .rq_err(c0_rq_err),
+        .wq_req(c0_wq_req), .wq_drv(c0_wq_drv), .wq_fsec(c0_wq_fsec),
+        .wq_fetch(c0_wq_fetch), .wq_idx(c0_wq_idx), .wq_dat(c0_wq_dat),
+        .wq_done(c0_wq_done), .wq_err(c0_wq_err),
         .trk_req(trk_req), .trk_drv(trk_drv), .trk_track(trk_track),
+        .trk_side(trk_side),
         .trk_vld(trk_vld), .trk_data(trk_data), .trk_idx(trk_idx),
         .trk_done(trk_done), .trk_err(trk_err),
         .trk_len(trk_len), .trk_dbl(trk_dbl), .drv_wp(drv_wp),
         .trk_wb_req(trk_wb_req), .trk_wb_fetch(trk_wb_fetch),
         .trk_wb_idx(trk_wb_idx), .trk_wb_data(trk_wb_data),
         .trk_wb_done(trk_wb_done), .trk_wb_err(trk_wb_err)
+    );
+
+    // ------------------------------------------------------------------
+    // SD arbiter + cassette deck (M2): the DMK fetcher and the tape
+    // share the one sector server; the cassette reads slot 4
+    // (TRS80/CASSETTE/*.CAS) and records into slot 5 (CASSOUT.CAS).
+    // ------------------------------------------------------------------
+    m1_sd_arb u_sd_arb (
+        .clk(clk), .rst_n(por_rst_n),
+        .rq_req(rq_req), .rq_drv(rq_drv), .rq_fsec(rq_fsec),
+        .rq_vld(rq_vld), .rq_dat(rq_dat), .rq_idx(rq_idx),
+        .rq_done(rq_done), .rq_err(rq_err),
+        .wq_req(wq_req), .wq_drv(wq_drv), .wq_fsec(wq_fsec),
+        .wq_fetch(wq_fetch), .wq_idx(wq_idx), .wq_dat(wq_dat),
+        .wq_done(wq_done), .wq_err(wq_err),
+        .c0_rq_req(c0_rq_req), .c0_rq_drv(c0_rq_drv),
+        .c0_rq_fsec(c0_rq_fsec),
+        .c0_rq_vld(c0_rq_vld), .c0_rq_dat(c0_rq_dat),
+        .c0_rq_idx(c0_rq_idx),
+        .c0_rq_done(c0_rq_done), .c0_rq_err(c0_rq_err),
+        .c0_wq_req(c0_wq_req), .c0_wq_drv(c0_wq_drv),
+        .c0_wq_fsec(c0_wq_fsec),
+        .c0_wq_fetch(c0_wq_fetch), .c0_wq_idx(c0_wq_idx),
+        .c0_wq_dat(c0_wq_dat),
+        .c0_wq_done(c0_wq_done), .c0_wq_err(c0_wq_err),
+        .c1_rq_req(c1_rq_req), .c1_rq_fsec(c1_rq_fsec),
+        .c1_rq_vld(c1_rq_vld), .c1_rq_dat(c1_rq_dat),
+        .c1_rq_idx(c1_rq_idx),
+        .c1_rq_done(c1_rq_done), .c1_rq_err(c1_rq_err),
+        .c1_wq_req(c1_wq_req), .c1_wq_fsec(c1_wq_fsec),
+        .c1_wq_fetch(c1_wq_fetch), .c1_wq_idx(c1_wq_idx),
+        .c1_wq_dat(c1_wq_dat),
+        .c1_wq_done(c1_wq_done), .c1_wq_err(c1_wq_err)
+    );
+
+    m1_cass_sd u_cass (
+        .clk(clk), .rst_n(por_rst_n),
+        .fs_ready(fs_ready),
+        .cas_in_ok(drv_mounted[4]), .cas_out_ok(drv_mounted[5]),
+        .cas_len(cas_len),
+        .rq_req(c1_rq_req), .rq_fsec(c1_rq_fsec),
+        .rq_vld(c1_rq_vld), .rq_dat(c1_rq_dat), .rq_idx(c1_rq_idx),
+        .rq_done(c1_rq_done), .rq_err(c1_rq_err),
+        .wq_req(c1_wq_req), .wq_fsec(c1_wq_fsec),
+        .wq_fetch(c1_wq_fetch), .wq_idx(c1_wq_idx),
+        .wq_dat(c1_wq_dat),
+        .wq_done(c1_wq_done), .wq_err(c1_wq_err),
+        .motor(cass_motor), .cass_out(cass_out), .cass_in(cass_in_w)
     );
 
     // the seam m1_rom sees: self-test first, SD re-load afterwards
@@ -316,10 +389,11 @@ module ulx3s_top (
         .ld_data     (ld_data),
 
         .ei_ram_cfg  (ei_ram_cfg),    // EI RAM population (ADR-0005)
-        .fdc_disk    (drv_mounted),   // media = mounted DMKs from the card
+        .fdc_disk    (drv_mounted[3:0]),   // mounted DMKs from the card
         .fdc_wp      (drv_wp),        // WP straight from the DMK headers
         .percom_en   (~sw[3]),        // DIP4 OFF = Doubler fitted
         .trk_req(trk_req), .trk_drv(trk_drv), .trk_track(trk_track),
+        .trk_side(trk_side),
         .trk_vld(trk_vld), .trk_data(trk_data), .trk_idx(trk_idx),
         .trk_done(trk_done), .trk_err(trk_err),
         .trk_len(trk_len), .trk_dbl(trk_dbl),
@@ -333,7 +407,7 @@ module ulx3s_top (
         .dbg_out_ready(dbg_rsp_ready),
         .keys        (keys),          // USB-HID front end (ADR-0004)
 
-        .cass_in     (1'b0),
+        .cass_in     (cass_in_w),     // SD cassette deck (M2)
         .cass_out    (cass_out),
         .cass_motor  (cass_motor),
 

@@ -8,6 +8,7 @@ This directory builds a self-contained interactive emulator that runs the full
 | `m1_scan_fb.v` + DVI stack | `emu_display.cpp` — SDL2 window (384×192 × scale) |
 | `m1_hid_keys.v` + USB host | `emu_keyboard.cpp` — SDL2 keyboard events |
 | `m1_dmk_fetch.v` + `m1_sd_fs.v` + `sd_spi_host.v` | `emu_disk.cpp` — DMK files from the host filesystem |
+| `m1_cass_sd.v` (SD tape deck) | `emu_cass.cpp` — .cas/.wav files from the host filesystem |
 | `m1_pll.v` | Fixed Verilator clock (optionally throttled to 10.6 MHz) |
 
 No RTL is modified.  The existing `sim/tb_*.sv` tests remain unaffected.

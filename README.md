@@ -27,12 +27,15 @@ simulation before silicon.
 
 ## Where it stands
 
-The machine is real: it boots TRSDOS 2.3 and NEWDOS/80 2.0 from SD card to
+The machine is real: it boots TRSDOS 2.3 and NEWDOS/80 from SD card to
 `DOS READY` on a physical ULX3S — monitor over HDMI, USB keyboard, mixed-density
-DMK disks, video snow included. On top sits a debug core that halts and
-single-steps the live Z80 from VS Code. And if you have no board, the same RTL
-runs as an interactive desktop emulator under Verilator ([`sim/emu/`](sim/emu/README.md)) —
-same machine, same disks, same debugger.
+and double-sided DMK disks, video snow included. The cassette is real too:
+Space Invaders loads from a 500-baud WAV via `SYSTEM`, and `CSAVE`/`CLOAD`
+round-trip byte-exact — read and write timing pinned against trs80gp. On top
+sits a debug core that halts and single-steps the live Z80 from VS Code. And
+if you have no board, the same RTL runs as an interactive desktop emulator
+under Verilator ([`sim/emu/`](sim/emu/README.md)) — same machine, same disks,
+same tapes, same debugger.
 
 I can state all that plainly for the same reason I can be corrected on it:
 checkmarks appear in this repository only when something runs *and is verified*
@@ -70,8 +73,8 @@ here is a story for another time and place.
 
 | Tier | Contents |
 |---|---|
-| **Committed, built and golden-verified** | Rev G mainboard · Level II 1.3 · 48 KB · video incl. snow · expansion interface · WD1771/1791 dual-controller FDC with **mixed-density** disk support (DMK) · debug core with VS-Code integration · desktop emulator — all live on hardware and byte-exact against trs80gp |
-| **Committed, next up** | Cassette (M2, the last gap in the base machine) · RS-232-C (M5) · Centronics (M6) |
+| **Committed, built and golden-verified** | Rev G mainboard · Level II 1.3 · 48 KB · video incl. snow · expansion interface · WD1771/1791 dual-controller FDC with **mixed-density** and **double-sided** disk support (DMK) · cassette (M2: 500-baud read/write, `.cas`+WAV, SD deck) · debug core with VS-Code integration · desktop emulator — all byte-exact against trs80gp |
+| **Committed, next up** | RS-232-C (M5) · Centronics (M6) |
 | **Vision** (direction, deliberately open) | ESP32 companion (untethered debug server, disk sources, telemetry, drive sound) · virtual expansion-card bus · TRS-IO/FreHD · PCG-80 · raster interrupt · CP/M (Omikron mapper + 64 KB Rev-Z board) · enclosure |
 
 Details and reasoning in [ROADMAP.md](ROADMAP.md). What belongs in Rev Z is a standing

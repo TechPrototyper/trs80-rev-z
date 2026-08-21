@@ -15,9 +15,13 @@
 // the drive unusable; requests for it — or for a track beyond the track
 // count, or from an unmounted drive — answer with a clean trk_err pulse.
 //
-// Track T of a DMK lives at file bytes 16 + T*tracklen .. +tracklen-1;
-// the fetcher walks the covering 512-byte file sectors and forwards the
-// bytes that fall inside the window.
+// Track T of a single-sided DMK lives at file bytes 16 + T*tracklen;
+// double-sided images (header bit 4 clear) store two blocks per
+// cylinder, so the block index is T*2 + side (the DS drive-select
+// convention, latch bit 3 — see rtl/m1_drives.v). Side 1 of a
+// single-sided image answers trk_err, like a drive without a second
+// head. The fetcher walks the covering 512-byte file sectors and
+// forwards the bytes that fall inside the window.
 
 module m1_dmk_fetch (
     input  wire        clk,          // dot clock
@@ -48,6 +52,7 @@ module m1_dmk_fetch (
     input  wire        trk_req,
     input  wire [1:0]  trk_drv,
     input  wire [6:0]  trk_track,
+    input  wire        trk_side,
     output reg         trk_vld,
     output reg  [7:0]  trk_data,
     output reg  [12:0] trk_idx,
@@ -73,6 +78,7 @@ module m1_dmk_fetch (
     reg [7:0]  h_ntrk [0:3];
     reg [12:0] h_tlen [0:3];
     reg [3:0]  h_dbl;
+    reg [3:0]  h_ss;                 // header bit 4: single-sided
     reg [3:0]  h_wp;
     assign drv_wp = h_wp;
 
@@ -91,20 +97,26 @@ module m1_dmk_fetch (
     reg [1:0]  hd;
     reg [7:0]  s_ntrk;
     reg [15:0] s_tlen;
-    reg [1:0]  s_flags;              // header bits 7:6 only
+    reg [1:0]  s_flags;              // header bits 7:6
+    reg        s_ss;                 // header bit 4 (single-sided)
     reg        s_wp;
 
     // write-back scratch
     reg [9:0]  mb;                   // merge byte cursor 0..511
     reg [1:0]  mset;                 // fetch-settle counter
-    wire [19:0] g_mb = {rq_fsec[10:0], 9'd0} + {10'd0, mb};
-    // byte range of the requested track (combinational, both serve paths)
-    wire [19:0] req_start = 20'd16
-                            + {13'd0, trk_track} * {7'd0, h_tlen[trk_drv]};
+    wire [20:0] g_mb = {rq_fsec[11:0], 9'd0} + {11'd0, mb};
+    // byte range of the requested track (combinational, both serve
+    // paths). DS images: two blocks per cylinder, block = T*2 + side.
+    wire [8:0]  req_blk   = h_ss[trk_drv]
+                            ? {2'd0, trk_track}
+                            : ({1'd0, trk_track, 1'b0} + {8'd0, trk_side});
+    wire        req_noside = trk_side && h_ss[trk_drv];
+    wire [20:0] req_start = 21'd16
+                            + {12'd0, req_blk} * {8'd0, h_tlen[trk_drv]};
 
     // serve scratch
-    reg [19:0] t_start, t_end;       // byte range of the track in the file
-    wire [19:0] g_off = {rq_fsec[10:0], 9'd0} + {11'd0, rq_idx};
+    reg [20:0] t_start, t_end;       // byte range of the track in the file
+    wire [20:0] g_off = {rq_fsec[11:0], 9'd0} + {12'd0, rq_idx};
 
     localparam [3:0]
         H_WAIT = 4'd0,
@@ -127,10 +139,12 @@ module m1_dmk_fetch (
             state    <= H_WAIT;
             hok      <= 4'b0000;
             h_dbl    <= 4'b0000;
+            h_ss     <= 4'b1111;
             hd       <= 2'd0;
             s_ntrk   <= 8'd0;
             s_tlen   <= 16'd0;
             s_flags  <= 2'd0;
+            s_ss     <= 1'b1;
             s_wp     <= 1'b0;
             h_wp     <= 4'b0000;
             mb       <= 10'd0;
@@ -145,8 +159,8 @@ module m1_dmk_fetch (
             rq_req   <= 1'b0;
             rq_drv   <= 2'd0;
             rq_fsec  <= 13'd0;
-            t_start  <= 20'd0;
-            t_end    <= 20'd0;
+            t_start  <= 21'd0;
+            t_end    <= 21'd0;
             trk_vld  <= 1'b0;
             trk_data <= 8'd0;
             trk_idx  <= 13'd0;
@@ -186,7 +200,10 @@ module m1_dmk_fetch (
                             9'd1: s_ntrk        <= rq_dat;
                             9'd2: s_tlen[7:0]   <= rq_dat;
                             9'd3: s_tlen[15:8]  <= rq_dat;
-                            9'd4: s_flags       <= rq_dat[7:6];
+                            9'd4: begin
+                                      s_flags <= rq_dat[7:6];
+                                      s_ss    <= rq_dat[4];
+                                  end
                             default: ;
                         endcase
                     end
@@ -196,6 +213,7 @@ module m1_dmk_fetch (
                             h_ntrk[hd] <= s_ntrk;
                             h_tlen[hd] <= s_tlen[12:0];
                             h_dbl[hd]  <= (s_flags == 2'b00);
+                            h_ss[hd]   <= s_ss;
                             h_wp[hd]   <= s_wp;
                         end
                         state <= H_NEXT;
@@ -214,32 +232,32 @@ module m1_dmk_fetch (
 
                 // ---- serve track requests ----
                 S_IDLE: if (trk_wb_req) begin
-                    if (!hok[trk_drv]
+                    if (!hok[trk_drv] || req_noside
                         || {1'b0, trk_track} >= h_ntrk[trk_drv][7:0])
                         trk_wb_err <= 1'b1;
                     else begin
                         t_start <= req_start;
-                        t_end   <= req_start + {7'd0, h_tlen[trk_drv]};
+                        t_end   <= req_start + {8'd0, h_tlen[trk_drv]};
                         rq_drv  <= trk_drv;
                         wq_drv  <= trk_drv;
-                        rq_fsec <= {2'd0, req_start[19:9]};
+                        rq_fsec <= {1'd0, req_start[20:9]};
                         state   <= W_RREQ;
                     end
                 end else if (trk_req) begin
-                    if (!hok[trk_drv]
+                    if (!hok[trk_drv] || req_noside
                         || {1'b0, trk_track} >= h_ntrk[trk_drv][7:0])
                         trk_err <= 1'b1;
                     else begin
                         trk_len <= h_tlen[trk_drv];
                         trk_dbl <= h_dbl[trk_drv];
                         t_start <= req_start;
-                        t_end   <= req_start + {7'd0, h_tlen[trk_drv]};
+                        t_end   <= req_start + {8'd0, h_tlen[trk_drv]};
                         rq_drv  <= trk_drv;
                         state   <= S_REQ;
                     end
                 end
                 S_REQ: begin
-                    rq_fsec <= {2'd0, t_start[19:9]};    // first covering
+                    rq_fsec <= {1'd0, t_start[20:9]};    // first covering
                     rq_req  <= 1'b1;                     // file sector
                     state   <= S_RD;
                 end
@@ -252,7 +270,7 @@ module m1_dmk_fetch (
                     if (rq_done) begin
                         // done when the NEXT file sector starts at or
                         // past the end of the track window
-                        if ({{rq_fsec[10:0] + 11'd1}, 9'd0} >= t_end) begin
+                        if ({{rq_fsec[11:0] + 12'd1}, 9'd0} >= t_end) begin
                             trk_done <= 1'b1;
                             state    <= S_IDLE;
                         end else begin
@@ -311,7 +329,7 @@ module m1_dmk_fetch (
                 W_WR: begin
                     // wq_fetch/wq_dat run through the staged sector above
                     if (wq_done) begin
-                        if ({{rq_fsec[10:0] + 11'd1}, 9'd0} >= t_end) begin
+                        if ({{rq_fsec[11:0] + 12'd1}, 9'd0} >= t_end) begin
                             trk_wb_done <= 1'b1;
                             state       <= S_IDLE;
                         end else begin

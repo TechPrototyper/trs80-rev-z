@@ -7,12 +7,16 @@
 //                  ROM through the ld_* seam (unchanged from the verified
 //                  m1_sd_loader; the self-test image stays as the visible
 //                  fallback when the card or the file is missing).
-//   2. Mounts    — for each of TRS80/DRIVE0..DRIVE3/ takes the FIRST
-//                  *.DMK entry (8.3 extension match, directory order),
-//                  walks its cluster chain ONCE and caches it as a
+//   2. Mounts    — six slots. 0..3: for each of TRS80/DRIVE0..DRIVE3/
+//                  the FIRST *.DMK entry (8.3 extension match, directory
+//                  order). 4: the first *.CAS in TRS80/CASSETTE/ (the
+//                  tape in the deck). 5: TRS80/CASSOUT.CAS (the
+//                  pre-allocated recording target — in-place writes,
+//                  like the DMKs, so the FAT is never touched). Each
+//                  slot's cluster chain is walked ONCE and cached as a
 //                  cluster->LBA table in BRAM. A missing directory, a
 //                  missing image or an implausible file simply leaves
-//                  that drive unmounted — never an error.
+//                  that slot unmounted — never an error.
 //   3. Serve     — random access: a request (rq_drv, rq_fsec) streams one
 //                  512-byte sector of that drive's image; file offset to
 //                  LBA is an O(1) table lookup. This is the seam the FDC
@@ -82,8 +86,10 @@ module m1_sd_fs #(
     output reg         err,        // ROM not (cleanly) from the card (LED)
     output wire        init_err,   // the CARD never initialized (SPI level)
 
-    // drive mounts (phase 2 results)
-    output reg  [3:0]  drv_mounted,
+    // slot mounts (phase 2 results): 0-3 drives, 4 cassette in,
+    // 5 cassette out
+    output reg  [5:0]  drv_mounted,
+    output reg  [31:0] cas_len,     // slot 4 file size in bytes
     output reg         fs_ready,   // mounts finished, server accepting
 
     // sector server: one 512-byte sector of a mounted drive's image.
@@ -91,7 +97,7 @@ module m1_sd_fs #(
     // rq_done (after 512 rq_vld bytes) or rq_err (unmounted drive, sector
     // beyond the image, or the card died).
     input  wire        rq_req,     // pulse
-    input  wire [1:0]  rq_drv,
+    input  wire [2:0]  rq_drv,     // slot
     input  wire [12:0] rq_fsec,    // 512-byte sector index within the image
     output wire        rq_vld,
     output wire [7:0]  rq_dat,
@@ -104,7 +110,7 @@ module m1_sd_fs #(
     // clocks later. In-place CMD24 through the same cluster map; DMK
     // files never change size, so the FAT is never touched.
     input  wire        wq_req,     // pulse
-    input  wire [1:0]  wq_drv,
+    input  wire [2:0]  wq_drv,     // slot
     input  wire [12:0] wq_fsec,
     output wire        wq_fetch,
     output wire [8:0]  wq_idx,
@@ -235,22 +241,25 @@ module m1_sd_fs #(
         SJ_DMK  = 2'd3;              // first *.DMK in DRIVEn/
 
     localparam [87:0] EXT_DMK = "????????DMK";   // name half unused
+    localparam [87:0] EXT_CAS = "????????CAS";
+    localparam [87:0] DIR_CASS = "CASSETTE   ";
+    localparam [87:0] FILE_CASSOUT = "CASSOUT CAS";
 
     reg  [1:0]  scan_job;
     reg  [31:0] trs_clus;            // TRS80/ start cluster (mounts rescan it)
-    reg  [1:0]  drv_i;               // drive being mounted
-    wire [7:0]  drv_digit = 8'h30 + {6'd0, drv_i};
+    reg  [2:0]  drv_i;               // slot being mounted
+    wire [7:0]  drv_digit = 8'h30 + {6'd0, drv_i[1:0]};
 
     // ------------------------------------------------------------------
     // Cluster map (phase 2 product, phase 3 lookup): {drive, index} ->
     // LBA of the cluster's first sector. Registered read for EBR.
     // ------------------------------------------------------------------
-    reg  [31:0] cmap [0:1023];
+    reg  [31:0] cmap [0:2047];
     reg  [31:0] cmap_q;
-    reg  [9:0]  map_raddr;
+    reg  [10:0] map_raddr;
     reg  [7:0]  map_idx;
     reg  [8:0]  need_n;              // map entries this image needs
-    reg  [12:0] drv_secs [0:3];      // image length in 512-byte sectors
+    reg  [12:0] drv_secs [0:5];      // image length in 512-byte sectors
 
     // image geometry, valid while f_size < 2 MiB (checked first)
     wire [12:0] f_secs_w = {1'b0, f_size[20:9]} + {12'd0, |f_size[8:0]};
@@ -350,12 +359,13 @@ module m1_sd_fs #(
             err_pending  <= 1'b0;
             scan_job     <= SJ_ROOT;
             trs_clus     <= 32'd0;
-            drv_i        <= 2'd0;
-            map_raddr    <= 10'd0;
+            drv_i        <= 3'd0;
+            map_raddr    <= 11'd0;
             map_idx      <= 8'd0;
             need_n       <= 9'd0;
             s_off        <= 7'd0;
-            drv_mounted  <= 4'b0000;
+            drv_mounted  <= 6'b000000;
+            cas_len      <= 32'd0;
             fs_ready     <= 1'b0;
             rq_done      <= 1'b0;
             rq_err       <= 1'b0;
@@ -614,8 +624,9 @@ module m1_sd_fs #(
                             file_size <= f_size;
                             state     <= L_GATE;
                         end
-                        SJ_DRVD: begin           // DRIVEn/: find its DMK
-                            search_name <= EXT_DMK;
+                        SJ_DRVD: begin           // slot dir: find its image
+                            search_name <= (drv_i == 3'd4) ? EXT_CAS
+                                                           : EXT_DMK;
                             want_dir    <= 1'b0;
                             ext_match   <= 1'b1;
                             scan_job    <= SJ_DMK;
@@ -640,7 +651,7 @@ module m1_sd_fs #(
                         end
                         SJ_ROMF: begin           // no ROM: fallback stays,
                             err   <= 1'b1;       // drives still mount
-                            drv_i <= 2'd0;
+                            drv_i <= 3'd0;
                             state <= L_MNT;
                         end
                         default:                 // drive dir or DMK missing:
@@ -712,7 +723,7 @@ module m1_sd_fs #(
                     // the fallback image and moves on to the mounts
                     if (file_clus[27:0] < 28'd2 || file_size == 32'd0) begin
                         err   <= 1'b1;
-                        drv_i <= 2'd0;
+                        drv_i <= 3'd0;
                         state <= L_MNT;
                     end else if (ld_gate) begin
                         load_len <= (file_size >= {18'd0, ROM_LEN})
@@ -772,18 +783,31 @@ module m1_sd_fs #(
                         if (h_init_err || h_rd_err)
                             state <= L_DEAD;     // the card itself died
                         else begin
-                            drv_i <= 2'd0;
+                            drv_i <= 3'd0;
                             state <= L_MNT;
                         end
                     end
                 end
 
-                // ---- phase 2: mount DRIVE0..DRIVE3 -------------------
+                // ---- phase 2: mount the six slots --------------------
+                //   0-3  TRS80/DRIVEn/  -> first *.DMK
+                //   4    TRS80/CASSETTE/ -> first *.CAS
+                //   5    TRS80/CASSOUT.CAS (a plain file, mapped directly)
                 L_MNT: begin
-                    search_name <= {"DRIVE", drv_digit, "     "};
-                    want_dir    <= 1'b1;
+                    if (drv_i == 3'd5) begin
+                        search_name <= FILE_CASSOUT;
+                        want_dir    <= 1'b0;
+                        scan_job    <= SJ_DMK;   // file hit -> map it
+                    end else if (drv_i == 3'd4) begin
+                        search_name <= DIR_CASS;
+                        want_dir    <= 1'b1;
+                        scan_job    <= SJ_DRVD;
+                    end else begin
+                        search_name <= {"DRIVE", drv_digit, "     "};
+                        want_dir    <= 1'b1;
+                        scan_job    <= SJ_DRVD;
+                    end
                     ext_match   <= 1'b0;
-                    scan_job    <= SJ_DRVD;
                     cur_clus    <= trs_clus;
                     sec_i       <= 7'd0;
                     found       <= 1'b0;
@@ -799,6 +823,8 @@ module m1_sd_fs #(
                         state <= L_MNT_NEXT;
                     else begin
                         drv_secs[drv_i] <= f_secs_w;
+                        if (drv_i == 3'd4)
+                            cas_len <= f_size;
                         need_n   <= need_w[8:0];
                         cur_clus <= f_clus;
                         sec_i    <= 7'd0;
@@ -818,10 +844,10 @@ module m1_sd_fs #(
                     end
                 end
                 L_MNT_NEXT: begin
-                    if (drv_i == 2'd3)
+                    if (drv_i == 3'd5)
                         state <= L_SERVE;
                     else begin
-                        drv_i <= drv_i + 2'd1;
+                        drv_i <= drv_i + 3'd1;
                         state <= L_MNT;
                     end
                 end
@@ -881,7 +907,7 @@ module m1_sd_fs #(
                 L_DEAD: begin
                     err         <= 1'b1;
                     fs_ready    <= 1'b1;
-                    drv_mounted <= 4'b0000;
+                    drv_mounted <= 6'b000000;
                     if (rq_req) rq_err <= 1'b1;
                     if (wq_req) wq_err <= 1'b1;
                 end

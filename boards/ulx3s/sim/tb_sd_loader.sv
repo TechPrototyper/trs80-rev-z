@@ -78,13 +78,13 @@ module tb_sd_loader;
         .sys_ready(), .init_err(),
         /* verilator lint_on PINCONNECTEMPTY */
         // mount/serve phases idle here — tb_sd_fs covers them
-        .rq_req(1'b0), .rq_drv(2'b00), .rq_fsec(13'd0),
-        .wq_req(1'b0), .wq_drv(2'b00), .wq_fsec(13'd0), .wq_dat(8'd0),
+        .rq_req(1'b0), .rq_drv(3'b000), .rq_fsec(13'd0),
+        .wq_req(1'b0), .wq_drv(3'b000), .wq_fsec(13'd0), .wq_dat(8'd0),
         /* verilator lint_off PINCONNECTEMPTY */
         .wq_fetch(), .wq_idx(), .wq_done(), .wq_err(),
         /* verilator lint_on PINCONNECTEMPTY */
         /* verilator lint_off PINCONNECTEMPTY */
-        .drv_mounted(), .fs_ready(),
+        .drv_mounted(), .fs_ready(), .cas_len(),
         .rq_vld(), .rq_dat(), .rq_idx(), .rq_done(), .rq_err()
         /* verilator lint_on PINCONNECTEMPTY */
     );
@@ -106,7 +106,7 @@ module tb_sd_loader;
         .ei_ram_cfg(2'b00),   // no EI RAM: 16K system, goldens unchanged
         .fdc_disk(4'b0000),   // (tb_sd_fs exercises the mounted-media path)
         /* verilator lint_off PINCONNECTEMPTY */
-        .trk_req(), .trk_drv(), .trk_track(),
+        .trk_req(), .trk_drv(), .trk_track(), .trk_side(),
         /* verilator lint_on PINCONNECTEMPTY */
         .trk_vld(1'b0), .trk_data(8'd0), .trk_idx(13'd0),
         .trk_done(1'b0), .trk_err(1'b1), .trk_len(13'd0), .trk_dbl(1'b0),
