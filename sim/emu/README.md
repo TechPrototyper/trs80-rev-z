@@ -78,6 +78,7 @@ drives 0–3 only; drive numbers above 3 do not exist.
 | `--cas-baud=<n>` | `500` | Baud rate for `.cas` pulse synthesis |
 | `--no-sound` | off | Disable program sound (default: the cassette output ladder — the Model 1's only voice — plays through SDL audio) |
 | `--volume=<n>` | `60` | Program-sound volume 0–100. Applies to the program channel only; drive sounds (M7 stage 2) will keep a fixed period-correct loudness relative to it |
+| `--drive-sounds=<dir>` | (synth) | Use real recordings for the drive voices: `seek_step_trs80.wav`/`step.wav` (the arm's clack) and `motor_trs80.wav`/`motor_loop.wav` (spindle loop), WAV 16-bit any rate. Missing files fall back per-voice to the synthesizer; the repo ships no audio assets |
 | `--no-drive-sounds` | off | Disable the drive sounds (four synthesized voices on the m1_drives event stream: per-drive detuned motor with spin-up and the one-shot's 3 s run-out, step clicks; all disks spin on the shared motor line). Fixed loudness relative to the program channel by design |
 | `--sound-dump=<file>` | (none) | Mirror the program-sound output into a 44.1 kHz WAV (listen/measure without a remote-desktop audio path in the way) |
 | `--cas-save=<file>` | (none) | Record what the machine writes: each motor-on stretch is decoded (500 baud) and saved as `.cas` bytes or a synthesized `.wav`; later saves get `-1`, `-2`, … suffixes |

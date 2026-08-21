@@ -23,6 +23,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <vector>
 
 class EmuAudio {
 public:
@@ -42,6 +43,13 @@ public:
     void tick(uint8_t ladder, uint8_t snd, uint8_t disks);
 
     void set_drive_sounds(bool on) { drives_on_ = on; }
+
+    // Load real recordings from a directory (WAV, mono/stereo, 16-bit,
+    // any rate): "seek_step_trs80.wav"/"step.wav" for the arm,
+    // "motor_trs80.wav"/"motor_loop.wav" as the spindle loop. Missing
+    // files fall back to the synthesized voice; without the option the
+    // engine is fully procedural (the repo ships no audio assets).
+    void load_drive_samples(const std::string& dir);
 
 private:
     uint32_t dev_ = 0;
@@ -70,9 +78,28 @@ private:
     float    menv_[4]   = {0, 0, 0, 0};    // motor envelope per drive
     float    hum_ph_[4] = {0, 0, 0, 0};
     float    rumble_[4] = {0, 0, 0, 0};    // low-passed noise state
-    float    click_[4]  = {0, 0, 0, 0};    // step-click envelope
     bool     step_pend_[4] = {false, false, false, false};
     uint32_t rng_ = 0x2626C3A5;
+
+    // sample players (loaded voices; -1 position = idle)
+    struct Samp { std::vector<float> d; float inc = 1.0f; };
+    Samp     smp_step_, smp_motor_;
+    float    sp_pos_[4] = {-1, -1, -1, -1};
+    float    sp_amp_[4] = {0, 0, 0, 0};
+    float    mp_pos_[4] = {0, 0, 0, 0};
+
+    static bool load_wav_mono(const std::string& path, Samp& out);
+
+    // step "clack": three struck-metal modes + a short sheet-metal
+    // case comb (the drive lived in a metal box — the arm's knock has
+    // a boxy ring, not a hiss)
+    float    ck_env_[3] = {0, 0, 0};
+    float    ck_ph_[3]  = {0, 0, 0};
+    float    ck_det_    = 1.0f;            // per-hit color (drive detune)
+    static constexpr int COMB = 512;       // ~11.6 ms at 44.1 kHz
+    float    comb_[COMB] = {};
+    int      comb_i_ = 0;
+    bool     comb_live_ = false;
 
     float drive_mix();
 

@@ -404,6 +404,7 @@ int main(int argc, char** argv)
     bool        hidden   = false;
     std::string sound_dump;
     bool        drive_sounds = true;
+    std::string drive_dir;
 
     for (int i = 1; i < argc; i++) {
         std::string a(argv[i]);
@@ -438,6 +439,7 @@ int main(int argc, char** argv)
         else if ((v = arg_value(a, "--volume=")) != "") { volume = atoi(v.c_str()); }
         else if ((v = arg_value(a, "--sound-dump=")) != "") { sound_dump = v; }
         else if (a == "--no-drive-sounds") { drive_sounds = false; }
+        else if ((v = arg_value(a, "--drive-sounds=")) != "") { drive_dir = v; }
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
@@ -472,6 +474,8 @@ int main(int argc, char** argv)
     if (sound && !sound_dump.empty())
         audio.dump_to(sound_dump);
     audio.set_drive_sounds(drive_sounds);
+    if (sound && drive_sounds && !drive_dir.empty())
+        audio.load_drive_samples(drive_dir);
     EmuKeyboard kbd;
     if (kbd_layout == "de") {
         kbd.set_layout(EmuKeyboard::Layout::DE);

@@ -104,6 +104,73 @@ bool EmuAudio::dump_to(const std::string& path)
     return true;
 }
 
+bool EmuAudio::load_wav_mono(const std::string& path, Samp& out)
+{
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f) return false;
+    std::vector<uint8_t> d;
+    uint8_t buf[65536];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof buf, f)) > 0)
+        d.insert(d.end(), buf, buf + n);
+    fclose(f);
+    if (d.size() < 44 || memcmp(d.data(), "RIFF", 4)
+        || memcmp(d.data() + 8, "WAVE", 4))
+        return false;
+    auto u32 = [&](size_t o) { return (uint32_t)d[o] | (uint32_t)d[o+1] << 8
+                                    | (uint32_t)d[o+2] << 16
+                                    | (uint32_t)d[o+3] << 24; };
+    auto u16 = [&](size_t o) { return (uint32_t)d[o] | (uint32_t)d[o+1] << 8; };
+    uint32_t rate = 0, ch = 1, bits = 16;
+    size_t doff = 0, dlen = 0;
+    for (size_t o = 12; o + 8 <= d.size();) {
+        uint32_t len = u32(o + 4);
+        if (!memcmp(&d[o], "fmt ", 4)) {
+            ch = u16(o + 10); rate = u32(o + 12); bits = u16(o + 22);
+        } else if (!memcmp(&d[o], "data", 4)) {
+            doff = o + 8; dlen = len;
+        }
+        o += 8 + len + (len & 1);
+    }
+    if (!rate || !doff || bits != 16) return false;
+    size_t bytes_per = 2 * ch, count = dlen / bytes_per;
+    out.d.clear();
+    out.d.reserve(count);
+    for (size_t i = 0; i < count; i++) {
+        size_t o = doff + i * bytes_per;
+        int16_t v = (int16_t)(d[o] | d[o + 1] << 8);
+        out.d.push_back((float)v / 32768.0f);
+    }
+    out.inc = (float)rate / 44100.0f;
+    return !out.d.empty();
+}
+
+void EmuAudio::load_drive_samples(const std::string& dir)
+{
+    static const char* step_names[]  = {"seek_step_trs80.wav", "step.wav"};
+    static const char* motor_names[] = {"motor_trs80.wav",
+                                        "motor_loop.wav"};
+    for (auto* nm : step_names)
+        if (smp_step_.d.empty())
+            load_wav_mono(dir + "/" + nm, smp_step_);
+    for (auto* nm : motor_names)
+        if (smp_motor_.d.empty())
+            load_wav_mono(dir + "/" + nm, smp_motor_);
+    fprintf(stderr,
+            "emu_audio: drive samples from %s — step %s, motor %s\n",
+            dir.c_str(),
+            smp_step_.d.empty()  ? "SYNTH" : "loaded",
+            smp_motor_.d.empty() ? "SYNTH" : "loaded");
+}
+
+static inline float samp_at(const std::vector<float>& v, float pos)
+{
+    size_t i = (size_t)pos;
+    if (i + 1 >= v.size()) return v.back();
+    float fr = pos - (float)i;
+    return v[i] + fr * (v[i + 1] - v[i]);
+}
+
 // One drive-sound sample: motor voices for every spinning drive plus
 // the step click of the selected one. Fixed loudness by design.
 float EmuAudio::drive_mix()
@@ -111,7 +178,7 @@ float EmuAudio::drive_mix()
     static const float detune[4] = {1.000f, 0.972f, 1.031f, 0.988f};
     float out = 0.0f;
     for (int d = 0; d < 4; d++) {
-        // white noise (xorshift), reused by both voices
+        // white noise (xorshift) for the motor rumble
         rng_ ^= rng_ << 13; rng_ ^= rng_ >> 17; rng_ ^= rng_ << 5;
         float noise = (float)(int32_t)rng_ * (1.0f / 2147483648.0f);
 
@@ -119,17 +186,59 @@ float EmuAudio::drive_mix()
             // run-out drops the pitch with the envelope — the spindle
             // audibly winds down after the 3 s motor one-shot expires
             float pitch = detune[d] * (0.55f + 0.45f * menv_[d]);
-            hum_ph_[d] += 2.0f * (float)M_PI * 96.0f * pitch / 44100.0f;
-            if (hum_ph_[d] > 2.0f * (float)M_PI)
-                hum_ph_[d] -= 2.0f * (float)M_PI;
-            rumble_[d] += 0.035f * pitch * (noise - rumble_[d]);
-            out += (0.55f * rumble_[d] + 0.20f * sinf(hum_ph_[d]))
-                   * menv_[d];
+            if (!smp_motor_.d.empty()) {
+                out += samp_at(smp_motor_.d, mp_pos_[d]) * menv_[d]
+                       * 0.9f;
+                mp_pos_[d] += smp_motor_.inc * pitch;
+                if (mp_pos_[d] >= (float)smp_motor_.d.size() - 2.0f)
+                    mp_pos_[d] = 0.0f;
+            } else {
+                hum_ph_[d] += 2.0f * (float)M_PI * 96.0f * pitch
+                              / 44100.0f;
+                if (hum_ph_[d] > 2.0f * (float)M_PI)
+                    hum_ph_[d] -= 2.0f * (float)M_PI;
+                rumble_[d] += 0.035f * pitch * (noise - rumble_[d]);
+                out += (0.55f * rumble_[d] + 0.20f * sinf(hum_ph_[d]))
+                       * menv_[d];
+            }
         }
-        if (click_[d] > 0.001f) {
-            out += noise * click_[d];
-            click_[d] *= 0.992f;             // ~3 ms decay
+
+        // step voice from a real recording: per-drive player, slight
+        // pitch color from the detune, amplitude jitter per hit
+        if (!smp_step_.d.empty() && sp_pos_[d] >= 0.0f) {
+            out += samp_at(smp_step_.d, sp_pos_[d]) * sp_amp_[d] * 1.4f;
+            sp_pos_[d] += smp_step_.inc * detune[d];
+            if (sp_pos_[d] >= (float)smp_step_.d.size() - 2.0f)
+                sp_pos_[d] = -1.0f;
         }
+    }
+
+    // The arm's step: a KNOCK, not a hiss — three damped struck-metal
+    // modes (body 620 Hz, metallic 1.9 kHz, a faint 3.4 kHz zing) fed
+    // through a short feedback comb: the drive's sheet-metal case
+    // ringing for a few reflections.
+    static const float f0[3]  = {620.0f, 1900.0f, 3400.0f};
+    static const float dk[3]  = {0.99811f, 0.99622f, 0.99434f};
+    static const float amp[3] = {0.55f, 0.30f, 0.12f};
+    float knock = 0.0f;
+    bool  ring  = false;
+    for (int m = 0; m < 3; m++) {
+        if (ck_env_[m] > 0.0005f) {
+            ring = true;
+            ck_ph_[m] += 2.0f * (float)M_PI * f0[m] * ck_det_ / 44100.0f;
+            if (ck_ph_[m] > 2.0f * (float)M_PI)
+                ck_ph_[m] -= 2.0f * (float)M_PI;
+            knock += amp[m] * ck_env_[m] * sinf(ck_ph_[m]);
+            ck_env_[m] *= dk[m];
+        }
+    }
+    if (ring || comb_live_) {
+        float echo = comb_[comb_i_];
+        float o    = knock + 0.34f * echo;
+        comb_[comb_i_] = o;
+        comb_i_ = (comb_i_ + 1) % COMB;
+        out += o * 1.1f;
+        comb_live_ = (echo > 0.0004f || echo < -0.0004f || ring);
     }
     return out;
 }
@@ -168,7 +277,22 @@ void EmuAudio::tick(uint8_t ladder, uint8_t snd, uint8_t disks)
         }
         if (step_pend_[d]) {
             step_pend_[d] = false;
-            click_[d] = 0.9f;
+            // strike: hard attack (phase reset), slight per-hit and
+            // per-drive variation so a seek rattles alive
+            rng_ ^= rng_ << 13; rng_ ^= rng_ >> 17; rng_ ^= rng_ << 5;
+            float v = 0.85f + 0.15f * ((float)(rng_ & 0xFFFF) / 65536.0f);
+            static const float detune[4] = {1.000f, 0.972f, 1.031f,
+                                            0.988f};
+            if (!smp_step_.d.empty()) {
+                sp_pos_[d] = 0.0f;         // real recording: retrigger
+                sp_amp_[d] = v;
+            } else {
+                ck_det_ = detune[d];
+                for (int m = 0; m < 3; m++) {
+                    ck_env_[m] = v;
+                    ck_ph_[m]  = 0.0f;
+                }
+            }
         }
     }
 
