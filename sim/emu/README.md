@@ -82,7 +82,9 @@ drives 0–3 only; drive numbers above 3 do not exist.
 | `--sound-dump=<file>` | (none) | Mirror the program-sound output into a 44.1 kHz WAV (listen/measure without a remote-desktop audio path in the way) |
 | `--cas-save=<file>` | (none) | Record what the machine writes: each motor-on stretch is decoded (500 baud) and saved as `.cas` bytes or a synthesized `.wav`; later saves get `-1`, `-2`, … suffixes |
 | `--kbd=<layout>` | `us` | Host keyboard layout (`us` or `de`) — scancodes are physical, so this decides which legend a key produces (QWERTZ swaps Y/Z, `:` sits on shift+`.`, …) |
-| `--debug-pty` | off | Expose the `m1_debug` binary-v0 link on a pseudo-tty |
+| `--debug-pty` | off | Expose the `m1_debug` binary-v0 link on a pseudo-tty. Known macOS quirk: on some launches with program sound active, the freshly started CoreAudio thread leaves the process's pty deaf from birth (bytes written to the slave never reach the master; per-launch, not per-access). Use `--debug-tcp` when scripting |
+| `--debug-tcp=<port>` | off | Same binary-v0 link on a localhost TCP listener — the robust choice for scripted/CI use; `tools/trszog_bridge.py --serial tcp:<port>` and `tools/emu_screen_dump.py tcp:<port>` speak it directly |
+| `--hidden` | off | No window on screen — scripted runs can't steal focus (a background test window once swallowed a whole chat message as TRS-80 keystrokes) |
 | `--pctrace=lo:hi:file` | off | Log every instruction-fetch PC in `[lo,hi]` (hex) to *file*, one `@xxxx` line each — diffable against `trs80gp -tr lo:hi` (this is how the NEWDOS lookup and aj6 boot divergences were root-caused) |
 | `--enter-until=<frame>` | off | Hold ENTER from power-on until the given frame (some DOS mods skip boot prompts on a held ENTER) |
 

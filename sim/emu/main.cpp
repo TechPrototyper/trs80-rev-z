@@ -61,7 +61,10 @@
 #include <thread>
 #include <vector>
 
+#include <cerrno>
 #include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <termios.h>
 #include <unistd.h>
 #if defined(__APPLE__)
@@ -267,6 +270,32 @@ private:
 // ---------------------------------------------------------------------------
 class DebugPty {
 public:
+    // TCP mode: a localhost listener instead of the pty. Same byte
+    // protocol; immune to a macOS oddity where a freshly started
+    // CoreAudio IO thread (program sound) can leave the process's pty
+    // deaf-from-birth on some launches (seen 2026-08-21; pty mode is
+    // fine without audio and on most launches with it).
+    bool open_tcp(int port)
+    {
+        lfd_ = socket(AF_INET, SOCK_STREAM, 0);
+        if (lfd_ < 0) { perror("socket"); return false; }
+        int one = 1;
+        setsockopt(lfd_, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
+        struct sockaddr_in a{};
+        a.sin_family = AF_INET;
+        a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        a.sin_port = htons((uint16_t)port);
+        if (bind(lfd_, (struct sockaddr*)&a, sizeof a) != 0
+            || listen(lfd_, 1) != 0) {
+            perror("bind/listen");
+            return false;
+        }
+        fcntl(lfd_, F_SETFL, O_NONBLOCK);
+        printf("emu_debug: binary-v0 debug link on tcp:%d\n", port);
+        fflush(stdout);
+        return true;
+    }
+
     bool open()
     {
         struct termios tio;
@@ -288,20 +317,49 @@ public:
         return true;
     }
 
-    bool enabled() const { return master_ >= 0; }
+    bool enabled() const { return master_ >= 0 || lfd_ >= 0; }
 
     // Called once per frame: move bytes between the pty and the queues.
     void service()
     {
         uint8_t buf[512];
         ssize_t n;
-        while ((n = ::read(master_, buf, sizeof buf)) > 0)
+        if (lfd_ >= 0) {
+            if (cfd_ < 0) {
+                cfd_ = accept(lfd_, nullptr, nullptr);
+                if (cfd_ >= 0) fcntl(cfd_, F_SETFL, O_NONBLOCK);
+            }
+            if (cfd_ >= 0) {
+                while ((n = ::read(cfd_, buf, sizeof buf)) > 0)
+                    for (ssize_t i = 0; i < n; i++) rx_.push_back(buf[i]);
+                if (n == 0) { close(cfd_); cfd_ = -1; }   // client gone
+                while (cfd_ >= 0 && !tx_.empty()) {
+                    size_t chunk = 0;
+                    while (chunk < sizeof buf && chunk < tx_.size())
+                        { buf[chunk] = tx_[chunk]; chunk++; }
+                    n = ::write(cfd_, buf, chunk);
+                    if (n <= 0) break;
+                    tx_.erase(tx_.begin(), tx_.begin() + n);
+                }
+            }
+            if (master_ < 0)
+                return;
+        }
+        while ((n = ::read(master_, buf, sizeof buf)) > 0) {
+            if (getenv("EMU_DBG_LOG"))
+                fprintf(stderr, "dbg: rx %zd bytes (first %02x)\n",
+                        n, buf[0]);
             for (ssize_t i = 0; i < n; i++) rx_.push_back(buf[i]);
+        }
+        if (getenv("EMU_DBG_LOG") && n < 0 && errno != EAGAIN)
+            fprintf(stderr, "dbg: read err %d\n", errno);
         while (!tx_.empty()) {
             size_t chunk = 0;
             while (chunk < sizeof buf && chunk < tx_.size())
                 { buf[chunk] = tx_[chunk]; chunk++; }
             n = ::write(master_, buf, chunk);
+            if (getenv("EMU_DBG_LOG"))
+                fprintf(stderr, "dbg: tx %zd/%zu\n", n, chunk);
             if (n <= 0) break;                    // EAGAIN: retry next frame
             tx_.erase(tx_.begin(), tx_.begin() + n);
         }
@@ -314,6 +372,7 @@ public:
 
 private:
     int master_ = -1;
+    int lfd_ = -1, cfd_ = -1;
     std::deque<uint8_t> rx_, tx_;
 };
 
@@ -329,6 +388,7 @@ int main(int argc, char** argv)
     bool        throttle   = false;
     double      throttle_factor = 1.0;
     bool        debug_pty  = false;
+    int         debug_tcp  = 0;
     bool        percom     = true;
     std::string type_text;
     int         type_at    = 900;
@@ -341,6 +401,7 @@ int main(int argc, char** argv)
     int         cas_baud = 500;
     bool        sound    = true;
     int         volume   = 60;
+    bool        hidden   = false;
     std::string sound_dump;
     bool        drive_sounds = true;
 
@@ -362,6 +423,7 @@ int main(int argc, char** argv)
             throttle = true; throttle_factor = atof(v.c_str());
         }
         else if (a == "--debug-pty") { debug_pty = true; }
+        else if ((v = arg_value(a, "--debug-tcp=")) != "") { debug_tcp = atoi(v.c_str()); }
         else if (a == "--no-percom") { percom = false; }
         else if ((v = arg_value(a, "--type=")) != "") { type_text = v; }
         else if ((v = arg_value(a, "--type-at=")) != "") { type_at = atoi(v.c_str()); }
@@ -372,6 +434,7 @@ int main(int argc, char** argv)
         else if ((v = arg_value(a, "--cas-baud=")) != "") { cas_baud = atoi(v.c_str()); }
         else if ((v = arg_value(a, "--cas-save=")) != "") { cas_save = v; }
         else if (a == "--no-sound") { sound = false; }
+        else if (a == "--hidden")   { hidden = true; }
         else if ((v = arg_value(a, "--volume=")) != "") { volume = atoi(v.c_str()); }
         else if ((v = arg_value(a, "--sound-dump=")) != "") { sound_dump = v; }
         else if (a == "--no-drive-sounds") { drive_sounds = false; }
@@ -417,9 +480,10 @@ int main(int argc, char** argv)
                 kbd_layout.c_str());
         return 1;
     }
-    EmuDisplay  disp(scale);
+    EmuDisplay  disp(scale, hidden);
     DebugPty    dbg;
     if (debug_pty && !dbg.open()) return 1;
+    if (debug_tcp && !dbg.open_tcp(debug_tcp)) return 1;
     AutoType    autotype;
     autotype.program(type_text, type_at);
 

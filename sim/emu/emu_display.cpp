@@ -9,17 +9,20 @@
 #include <cstring>
 #include <stdexcept>
 
-EmuDisplay::EmuDisplay(int scale)
+EmuDisplay::EmuDisplay(int scale, bool hidden)
     : scale_(scale)
 {
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
         throw std::runtime_error(SDL_GetError());
 
+    // hidden: scripted/CI runs — no window on screen, no focus stolen
+    // from whatever the user is typing into (a background test window
+    // once swallowed a whole chat message as TRS-80 keystrokes)
     win_ = SDL_CreateWindow(
         "TRS-80 Model I — Rev Z",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         W * scale_, H * scale_,
-        SDL_WINDOW_SHOWN);
+        hidden ? SDL_WINDOW_HIDDEN : SDL_WINDOW_SHOWN);
     if (!win_) throw std::runtime_error(SDL_GetError());
 
     ren_ = SDL_CreateRenderer(win_, -1,

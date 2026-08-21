@@ -24,7 +24,7 @@ class EmuKeyboard;
 class EmuDisplay {
 public:
     // scale: integer pixel multiplier (2 or 3 recommended).
-    explicit EmuDisplay(int scale = 2);
+    explicit EmuDisplay(int scale = 2, bool hidden = false);
     ~EmuDisplay();
 
     // Called per dot clock with m1_core's video outputs (after eval()).

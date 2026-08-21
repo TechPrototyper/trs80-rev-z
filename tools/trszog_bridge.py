@@ -26,6 +26,45 @@ import threading
 
 import serial  # pyserial
 
+
+class TcpSerial:
+    """serial.Serial-shaped wrapper over the emulator's --debug-tcp port
+    (--serial tcp:<port>): the same byte protocol over localhost TCP —
+    immune to the macOS pty/CoreAudio launch race (sim/emu/README.md)."""
+
+    def __init__(self, port):
+        import socket
+        self._socket = socket
+        self.sock = socket.create_connection(("127.0.0.1", port))
+        self.sock.settimeout(2)
+
+    def read(self, n=1):
+        try:
+            return self.sock.recv(n)
+        except self._socket.timeout:
+            return b""
+
+    def write(self, data):
+        self.sock.sendall(data)
+        return len(data)
+
+    def reset_input_buffer(self):
+        old = self.sock.gettimeout()
+        self.sock.settimeout(0.05)
+        try:
+            while self.sock.recv(4096):
+                pass
+        except (self._socket.timeout, BlockingIOError, OSError):
+            pass
+        self.sock.settimeout(old)
+
+    def reset_output_buffer(self):
+        pass
+
+    def close(self):
+        self.sock.close()
+
+
 # binary protocol v0 (rtl/m1_debug.v)
 C_HALT, C_RUN, C_STEP, C_REGS, C_SETR = 0x01, 0x02, 0x03, 0x04, 0x05
 C_RDM, C_WRM, C_SBP, C_STAT, C_SWP = 0x06, 0x07, 0x08, 0x09, 0x0A
@@ -70,6 +109,11 @@ class Link:
                 self.ser.close()
         except Exception:  # noqa: BLE001
             pass
+        if self.dev.startswith("tcp:"):
+            self.ser = TcpSerial(int(self.dev[4:]))
+            time.sleep(0.05)
+            self.ser.reset_input_buffer()
+            return
         try:
             self.ser = serial.Serial(self.dev, self.baud, timeout=2)
         except OSError:

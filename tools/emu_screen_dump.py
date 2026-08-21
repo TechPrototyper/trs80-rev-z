@@ -13,8 +13,14 @@ ICE), so avoid dumping while a sector transfer is in flight."""
 import os, sys, time, tty
 
 dev = sys.argv[1]
-fd = os.open(dev, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-tty.setraw(fd)
+if dev.startswith("tcp:"):
+    import socket
+    _sk = socket.create_connection(("127.0.0.1", int(dev[4:])), timeout=10)
+    _sk.setblocking(False)
+    fd = _sk.fileno()
+else:
+    fd = os.open(dev, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+    tty.setraw(fd)
 
 buf = b''
 def rd(n, timeout=20):
