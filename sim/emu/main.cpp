@@ -382,7 +382,8 @@ public:
             }
             if (cfd_ >= 0) {
                 while ((n = ::read(cfd_, buf, sizeof buf)) > 0)
-                    for (ssize_t i = 0; i < n; i++) rx_.push_back(buf[i]);
+                    for (ssize_t i = 0; i < n; i++)
+                        if (filter_rx(buf[i])) rx_.push_back(buf[i]);
                 if (n == 0) { close(cfd_); cfd_ = -1; }   // client gone
                 while (cfd_ >= 0 && !tx_.empty()) {
                     size_t chunk = 0;
@@ -400,7 +401,8 @@ public:
             if (getenv("EMU_DBG_LOG"))
                 fprintf(stderr, "dbg: rx %zd bytes (first %02x)\n",
                         n, buf[0]);
-            for (ssize_t i = 0; i < n; i++) rx_.push_back(buf[i]);
+            for (ssize_t i = 0; i < n; i++)
+                if (filter_rx(buf[i])) rx_.push_back(buf[i]);
         }
         if (getenv("EMU_DBG_LOG") && n < 0 && errno != EAGAIN)
             fprintf(stderr, "dbg: read err %d\n", errno);
@@ -421,10 +423,66 @@ public:
     void     rx_pop()           { rx_.pop_front(); }
     void     tx_push(uint8_t b) { tx_.push_back(b); }
 
+    // Debug-injected keyboard matrix (KEYS command), OR-ed into the
+    // machine's keys input. "Current report wins": each KEYS replaces it.
+    uint64_t debug_keys() const { return keys_mask_; }
+
 private:
+    // KEYS (0x0B, DEBUG-PROTOCOL.md) is a host-side affair — on the FPGA
+    // the USB HID keyboard feeds m1_hid_keys.v, here the debug link is the
+    // stand-in. The command is intercepted before the bytes reach the RTL
+    // debug core; to know which byte *is* a command, the stream framing
+    // (fixed arg counts, WRITE_MEM's variable payload) is tracked, exactly
+    // mirroring m1_debug.v's D_IDLE/D_ARGS structure. Responses stay
+    // correctly ordered because the host protocol is strictly
+    // command/response — the 0B ack is queued when the 8th byte arrives.
+    bool filter_rx(uint8_t b)
+    {
+        switch (fstate_) {
+        case F_CMD:
+            switch (b) {
+            case 0x0B:                      // KEYS: ours, don't forward
+                fstate_ = F_KEYS; fcnt_ = 8; fkeys_ = 0;
+                return false;
+            case 0x05: fstate_ = F_ARGS; fcnt_ = 3; break;          // SETR
+            case 0x06: case 0x08: case 0x0A:                        // RDM/SBP/SWP
+                fstate_ = F_ARGS; fcnt_ = 4; break;
+            case 0x07:                                              // WRM
+                fstate_ = F_WRM_HDR; fcnt_ = 4; fwrm_n_ = 0; break;
+            default: break;                 // 0-arg or unknown: stay F_CMD
+            }
+            return true;
+        case F_ARGS:
+            if (--fcnt_ == 0) fstate_ = F_CMD;
+            return true;
+        case F_WRM_HDR:
+            // header a_lo a_hi n_lo n_hi — collect n for the payload
+            if (fcnt_ == 2)      fwrm_n_ |= b;
+            else if (fcnt_ == 1) fwrm_n_ |= (uint32_t)b << 8;
+            if (--fcnt_ == 0)
+                fstate_ = fwrm_n_ ? F_WRM_PAY : F_CMD;
+            return true;
+        case F_WRM_PAY:
+            if (--fwrm_n_ == 0) fstate_ = F_CMD;
+            return true;
+        case F_KEYS:
+            fkeys_ = (fkeys_ >> 8) | ((uint64_t)b << 56); // row 0 first ->
+            if (--fcnt_ == 0) {                           // byte k = bits [8k+7:8k]
+                keys_mask_ = fkeys_;
+                tx_push(0x0B);              // ack
+                fstate_ = F_CMD;
+            }
+            return false;
+        }
+        return true;
+    }
+
     int master_ = -1;
     int lfd_ = -1, cfd_ = -1;
     std::deque<uint8_t> rx_, tx_;
+    enum { F_CMD, F_ARGS, F_WRM_HDR, F_WRM_PAY, F_KEYS } fstate_ = F_CMD;
+    uint32_t fcnt_ = 0, fwrm_n_ = 0;
+    uint64_t fkeys_ = 0, keys_mask_ = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -723,8 +781,9 @@ int main(int argc, char** argv)
         if (sound)
             audio.tick(top.cass_out, top.snd, disk.fdc_disk);
 
-        // --- Update keyboard matrix (live keyboard + scripted input) ---
-        top.keys = kbd.keys() | autotype.keys();
+        // --- Update keyboard matrix (live keyboard + scripted input
+        //     + debugger-injected KEYS) ---
+        top.keys = kbd.keys() | autotype.keys() | dbg.debug_keys();
         top.reset_btn_n = kbd.reset_pressed() ? 0 : 1;   // F12 = RESET button
         if (framecnt < (uint64_t)enter_until)
             top.keys |= uint64_t(1) << (6 * 8 + 0);   // hold ENTER (row 6 bit 0)
