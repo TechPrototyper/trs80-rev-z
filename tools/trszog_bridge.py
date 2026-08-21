@@ -563,10 +563,10 @@ class Bridge:
         srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         srv.bind(("127.0.0.1", port))
         srv.listen(1)
-        print(f"bridge: listening on 127.0.0.1:{port}")
+        print(f"bridge: listening on 127.0.0.1:{port}", flush=True)
         while True:
             self.sock, peer = srv.accept()
-            print(f"bridge: debugger connected from {peer}")
+            print(f"bridge: debugger connected from {peer}", flush=True)
             self.attached = True
             buf = b""
             try:
@@ -591,7 +591,7 @@ class Bridge:
                                             "message": str(ex)}
                         self.sock.sendall((json.dumps(rsp) + "\n").encode())
             finally:
-                print("bridge: debugger disconnected")
+                print("bridge: debugger disconnected", flush=True)
                 self.sock = None
                 self.detach()
 
@@ -618,7 +618,7 @@ class Bridge:
             if (self.link.status()[0] & 1):   # halted -> resume
                 self.link.run()
         except Exception as ex:  # noqa: BLE001
-            print(f"bridge: detach cleanup skipped ({ex})")
+            print(f"bridge: detach cleanup skipped ({ex})", flush=True)
 
 
 def main():
