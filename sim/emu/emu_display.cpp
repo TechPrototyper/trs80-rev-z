@@ -176,7 +176,11 @@ void EmuDisplay::build_bezel()
 void EmuDisplay::build_grid(float cx, float cy, float rx, float ry)
 {
     const int NX = 25, NY = 19;
-    const float K = 0.050f;                 // "straight enough"
+    // Barrel, not pincushion: a CRT face is (very slightly) convex
+    // toward the viewer, so straight lines bow OUTWARD, center a hair
+    // magnified, corners pinned — the first cut curved the wrong way
+    // ("Hohlspiegel") and far too much.
+    const float K = 0.016f;
     verts_.clear();
     idx_.clear();
     for (int gy = 0; gy < NY; gy++) {
@@ -184,13 +188,13 @@ void EmuDisplay::build_grid(float cx, float cy, float rx, float ry)
             float u = (float)gx / (NX - 1), v = (float)gy / (NY - 1);
             float nx = 2.0f * u - 1.0f, ny = 2.0f * v - 1.0f;
             float r2 = nx * nx + ny * ny;
-            float f  = (1.0f + K * r2) / (1.0f + 2.0f * K);
+            float f  = (1.0f - K * r2) / (1.0f - 2.0f * K);
             SDL_Vertex vx{};
             vx.position.x = cx + nx * f * rx;
             vx.position.y = cy + ny * f * ry;
             vx.tex_coord.x = u;
             vx.tex_coord.y = v;
-            Uint8 sh = (Uint8)(255.0f * (1.0f - 0.16f * r2));
+            Uint8 sh = (Uint8)(255.0f * (1.0f - 0.10f * r2));
             vx.color = {sh, sh, sh, 255};
             verts_.push_back(vx);
         }
