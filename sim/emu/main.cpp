@@ -36,6 +36,7 @@
 //   inserts host-clock sleeps to pace the simulation to real time.
 
 #include "Vm1_core.h"
+#include "Vm1_core___024root.h"
 #include "verilated.h"
 #include "verilated_vcd_c.h"
 
@@ -156,7 +157,10 @@ public:
             uint64_t m = glyph_mask(c);
             if (!m) continue;                    // no Model 1 equivalent
             steps_.push_back({m, 14});           // held (> 2 DOS scan ticks)
-            steps_.push_back({0, 10});           // released
+            // After ENTER the DOS reloads SYS overlays from disk and the
+            // ROM keyboard poll pauses — give it two machine-seconds
+            // before the next glyph, or its first characters are eaten.
+            steps_.push_back({0, c == '\n' ? 120 : 10});
         }
     }
 
@@ -294,6 +298,8 @@ int main(int argc, char** argv)
     std::string type_text;
     int         type_at    = 900;
     int         ei_cfg     = 2;   // 48K by default
+    std::string pctrace;          // "lo:hi:file" — instruction-fetch PC log
+    int         enter_until = 0;  // hold ENTER until this frame (boot skips)
 
     for (int i = 1; i < argc; i++) {
         std::string a(argv[i]);
@@ -313,6 +319,8 @@ int main(int argc, char** argv)
         else if (a == "--no-percom") { percom = false; }
         else if ((v = arg_value(a, "--type=")) != "") { type_text = v; }
         else if ((v = arg_value(a, "--type-at=")) != "") { type_at = atoi(v.c_str()); }
+        else if ((v = arg_value(a, "--pctrace=")) != "") { pctrace = v; }
+        else if ((v = arg_value(a, "--enter-until=")) != "") { enter_until = atoi(v.c_str()); }
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
@@ -347,6 +355,21 @@ int main(int argc, char** argv)
     VerilatedContext ctx;
     ctx.commandArgs(argc, argv);
     Vm1_core top(&ctx);
+
+    // ---- PC trace (instruction-fetch log, "lo:hi:file") ----
+    FILE*    pct_f  = nullptr;
+    unsigned pct_lo = 0, pct_hi = 0xFFFF;
+    if (!pctrace.empty()) {
+        size_t c1 = pctrace.find(':'), c2 = pctrace.find(':', c1 + 1);
+        if (c1 == std::string::npos || c2 == std::string::npos) {
+            fprintf(stderr, "--pctrace expects lo:hi:file (hex bounds)\n");
+            return 1;
+        }
+        pct_lo = strtoul(pctrace.substr(0, c1).c_str(), nullptr, 16);
+        pct_hi = strtoul(pctrace.substr(c1 + 1, c2 - c1 - 1).c_str(), nullptr, 16);
+        pct_f  = fopen(pctrace.substr(c2 + 1).c_str(), "w");
+        if (!pct_f) { perror("--pctrace file"); return 1; }
+    }
 
     // ---- Reset sequence (hold reset low for 4 clocks, then release) ----
     top.por_rst_n     = 0;
@@ -407,6 +430,7 @@ int main(int argc, char** argv)
 
     // ---- Main simulation loop ----
     bool running = true;
+    uint64_t framecnt = 0;
     while (running && !ctx.gotFinish()) {
 
         // --- Debug link: sample the handshake pre-edge (clk still 0 and
@@ -430,6 +454,23 @@ int main(int argc, char** argv)
             if (dbg_out_fire) dbg.tx_push(dbg_out_byte);
             top.dbg_in_valid = dbg.rx_pending() ? 1 : 0;
             top.dbg_in_data  = dbg.rx_pending() ? dbg.rx_front() : 0;
+        }
+
+        // --- PC trace: log each instruction fetch (M1/T1 rising edge).
+        // tv80 one-hot cycle state: mcycle[0] = M1, tstate[1] = T1; PC
+        // still holds the fetch address at that moment. ---
+        if (pct_f) {
+            static bool prev_m1t1 = false;
+            bool m1t1 =
+                (top.rootp->m1_core__DOT__u_cpu__DOT__z40__DOT__mcycle & 1) &&
+                (top.rootp->m1_core__DOT__u_cpu__DOT__z40__DOT__tstate & 2);
+            if (m1t1 && !prev_m1t1) {
+                unsigned pc =
+                    top.rootp->m1_core__DOT__u_cpu__DOT__z40__DOT__PC;
+                if (pc >= pct_lo && pc <= pct_hi)
+                    fprintf(pct_f, "@%04x\n", pc);
+            }
+            prev_m1t1 = m1t1;
         }
 
         // --- Feed disk model inputs (from m1_core outputs) ---
@@ -456,6 +497,8 @@ int main(int argc, char** argv)
 
         // --- Update keyboard matrix (live keyboard + scripted input) ---
         top.keys = kbd.keys() | autotype.keys();
+        if (framecnt < (uint64_t)enter_until)
+            top.keys |= uint64_t(1) << (6 * 8 + 0);   // hold ENTER (row 6 bit 0)
 
         // --- Capture video dot ---
         disp.write_pixel(top.pixel, (uint8_t)top.col,
@@ -471,7 +514,6 @@ int main(int argc, char** argv)
             disp.present();
             running = disp.poll_events(&kbd);
             autotype.frame();
-            static uint64_t framecnt = 0;
             if ((++framecnt % 60) == 0)
                 disp.set_frame(framecnt);
             if (dbg.enabled())
@@ -483,6 +525,7 @@ int main(int argc, char** argv)
             thr.wait_for_tick();
     }
 
+    if (pct_f) fclose(pct_f);
     top.final();
     return 0;
 }
