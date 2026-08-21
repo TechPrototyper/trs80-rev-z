@@ -64,6 +64,7 @@ the ESP32 link tomorrow.
 | `08` | SET_BP | `idx a_lo a_hi en` | `08` (idx 0–7) |
 | `09` | STATUS | — | `09 flags cause pc_lo pc_hi` |
 | `0A` | SET_WP | `idx a_lo a_hi rw` | `0A` (idx 0–3) |
+| `0B` | KEYS | 8 matrix bytes | `0B` (see below) |
 
 - **SET_REG idx:** 0 AF, 1 BC, 2 DE, 3 HL, 4 IX, 5 IY, 6 SP, 7 PC, 8 I,
   9 R, 10 AF′, 11 BC′, 12 DE′, 13 HL′. Values are 16-bit; 8-bit registers
@@ -77,6 +78,21 @@ the ESP32 link tomorrow.
 - **Memory** commands work only while halted; issued while running they
   return the error byte. `n` is a 16-bit count — the reference bridge
   chunks a whole-bank read into ≤ 32 KiB transactions.
+- **KEYS:** injects keyboard input. The 8 payload bytes are the TRS-80
+  keyboard matrix, byte *k* = row *k*, bit *j* = column *j*, 1 = pressed
+  (row 0 `@ A…G`, row 1 `H…O`, row 2 `P…W`, row 3 `X Y Z`, row 4 `0…7`,
+  row 5 `8 9 : ; , - . /`, row 6 `ENTER CLEAR BREAK ↑ ↓ ← → SPACE`,
+  row 7 `SHIFT`). The mask is OR-ed with the machine's physical keyboard
+  and follows the HID-report semantics of `m1_hid_keys.v`: **current
+  report wins** — each KEYS replaces the previous debug mask entirely, it
+  never accumulates; all-zeros releases everything. KEYS works while
+  running or halted and does not disturb the CPU. It is optional:
+  **probing** for it is safe and side-effect-free — send `0B` followed by
+  eight `00` bytes; a backend with KEYS replies a single `0B`, a plain-v0
+  backend replies `EE` for the `0B` and one `EE` per trailing `00` (`00`
+  is not a command and changes no state). The reference bridge probes
+  exactly this way once per session and surfaces the result as the
+  `keys` capability (Layer 2, `initialize`).
 
 ### GET_REGS — the 30 register bytes
 
@@ -138,7 +154,7 @@ The full method surface, as exercised by trszog:
 
 | Method | Params | Result | Notes |
 |---|---|---|---|
-| `initialize` | — | `{programName, version, modelName, modelNumber}` | capability handshake |
+| `initialize` | — | `{programName, version, modelName, modelNumber, capabilities?}` | capability handshake, see below |
 | `getRegisters` | — | register object, see below | |
 | `setRegister` | `{register, value}` | `true` | register name as in the register object |
 | `readMemory` | `{address, length\|size}` | `{address, size, data}` | `data` = hex string |
@@ -155,6 +171,35 @@ The full method surface, as exercised by trszog:
 
 Errors use standard JSON-RPC error objects (`-32601` unknown method,
 `-32602` bad params).
+
+### Capabilities (`initialize`)
+
+The ADR-0007 promise — *advertise the backend's real capabilities rather
+than masquerading* — is kept in the `initialize` result. `capabilities`
+is an optional object; a missing object (the debug-enabled trs80gp emits
+none) or a missing key means "assume the trs80gp baseline" so stock
+clients keep working. Keys defined so far:
+
+| Key | Type | Meaning |
+|---|---|---|
+| `setRegister` | bool | `setRegister` actually works (the trs80gp build's is broken) |
+| `stepOver` | bool | native `stepOver` (temp hardware breakpoint after CALL/RST/DJNZ) |
+| `breakpoints` | number | hardware PC-breakpoint slots (7 usable; slot 8 is the stepOver temp) |
+| `watchpoints` | number | hardware data-watchpoint slots (0 = none, see `x-setWatchpoints`) |
+| `keys` | bool | keyboard injection via `x-keys` (Layer 1 KEYS probed at session start) |
+
+The reference bridge reports
+`{"setRegister": true, "stepOver": true, "breakpoints": 7, "watchpoints": 4, "keys": <probed>}`.
+
+### Extension methods (`x-…`)
+
+Namespaced methods beyond the trszog/trs80gp surface, negotiated via the
+capabilities above. A backend without the capability answers `-32601`.
+
+| Method | Params | Result | Notes |
+|---|---|---|---|
+| `x-setWatchpoints` | `{watchpoints: [{address, access?}, …]}` | `true` | full replacement (like `setBreakpoints`); `access` ∈ `"r"` \| `"w"` \| `"rw"` (default `"rw"`); at most `capabilities.watchpoints` entries. An empty list clears all. A hit stops the machine and is reported as a `stopped` notification with reason `watchpoint` (the address is the halt PC, not the data address — the comparators fire on the data strobes). |
+| `x-keys` | `{matrix}` | `true` | `matrix` = 16 hex chars (8 bytes, row 0 first) — the Layer 1 KEYS payload verbatim, same "current report wins" semantics. Clients SHOULD send an all-zero matrix when their input surface loses focus, so no key sticks. |
 
 ### The register object
 
