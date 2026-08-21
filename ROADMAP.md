@@ -31,13 +31,23 @@ trs80gp), `cd boards/ulx3s && make bit` for the bitstream. If your run
 disagrees with a checkmark, please open an issue — the checkmark is wrong
 until proven otherwise.
 
-**Next up, in that order:** RS-232-C (M5), then Centronics (M6) — M2
-(Cassette) closed on 2026-08-21 with the read/write paths golden-pinned
-against trs80gp, the CSAVE/CLOAD round trip byte-exact through WAV, Space
-Invaders loading from the assembly corpus via `SYSTEM`, and the SD deck
-(`TRS80/CASSETTE/`, `CASSOUT.CAS`) simulation-verified on the board side
-(hardware smoke test pending). Along the way the machine grew double-sided
-disk support (drive-select bit 3, golden-verified; nd80206 boots) and two
+**Next up, in that order:** the ULX3S **hardware smoke test** (SD-card
+cassette deck and double-sided DMKs on the real board — everything is
+simulation-verified and waiting for a hands-on session), then the
+**companion UI** (runtime media swaps, switches, and the door/insert
+sounds that need them), then the **Z-Bus** — the virtual card bus with
+the physical 40-pin bridge, the project's next big milestone. RS-232-C
+(M5) and Centronics (M6) queue behind those.
+
+Recently closed: M2 (Cassette) on 2026-08-21 — read/write paths
+golden-pinned against trs80gp, CSAVE/CLOAD round trip byte-exact
+through WAV, Space Invaders loading from the assembly corpus via
+`SYSTEM`, SD deck (`TRS80/CASSETTE/`, `CASSOUT.CAS`)
+simulation-verified. M7 (Sound & Gestalt) in the same sweep: program
+sound from the cassette ladder, drive sounds tuned against measured
+reference spectra, and photographic monitor skins of both Video
+Display revisions. Along the way the machine grew double-sided disk
+support (drive-select bit 3, golden-verified; nd80206 boots) and two
 WD1771 fixes NEWDOS/80 depends on (Type I status after an idle forced
 interrupt; a gap-II floor before the data phase). See below for what
 "finish" means precisely for each milestone.

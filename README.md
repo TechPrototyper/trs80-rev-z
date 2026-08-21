@@ -74,7 +74,7 @@ here is a story for another time and place.
 | Tier | Contents |
 |---|---|
 | **Committed, built and golden-verified** | Rev G mainboard · Level II 1.3 · 48 KB · video incl. snow · expansion interface · WD1771/1791 dual-controller FDC with **mixed-density** and **double-sided** disk support (DMK) · cassette (M2: 500-baud read/write, `.cas`+WAV, SD deck) · debug core with VS-Code integration · desktop emulator — all byte-exact against trs80gp |
-| **Committed, next up** | RS-232-C (M5) · Centronics (M6) |
+| **Committed, next up** | ULX3S hardware smoke test · companion UI · Z-Bus — then RS-232-C (M5) · Centronics (M6) |
 | **Vision** (direction, deliberately open) | ESP32 companion (untethered debug server, disk sources, telemetry, drive sound) · virtual expansion-card bus · TRS-IO/FreHD · PCG-80 · raster interrupt · CP/M (Omikron mapper + 64 KB Rev-Z board) · enclosure |
 
 Details and reasoning in [ROADMAP.md](ROADMAP.md). What belongs in Rev Z is a standing
