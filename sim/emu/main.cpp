@@ -43,6 +43,7 @@
 #include "verilated.h"
 #include "verilated_vcd_c.h"
 
+#include "emu_audio.h"
 #include "emu_cass.h"
 #include "emu_disk.h"
 #include "emu_keyboard.h"
@@ -126,6 +127,18 @@ class Throttle {
 public:
     Throttle() : start_(std::chrono::steady_clock::now()), tick_(0) {}
 
+    // Pace factor: 1.0 = real time; below 1 slows the machine to a
+    // SUSTAINABLE constant rate. Useful because the model tops out
+    // around ~0.75x on current hosts — pinning e.g. 0.6 gives a rock-
+    // steady pace (and with it rock-steady audio pitch) instead of a
+    // host-load-dependent wander.
+    void set_factor(double f)
+    {
+        if (f < 0.05) f = 0.05;
+        if (f > 4.0)  f = 4.0;
+        ns_per_tick_ = 93.96 / f;
+    }
+
     void wait_for_tick()
     {
         // Target time for tick_: tick_ * 93.96 ns (period at 10.6445 MHz;
@@ -137,12 +150,13 @@ public:
         if (((++tick_) & 0x3FFF) != 0)
             return;
         using ns = std::chrono::nanoseconds;
-        auto target = start_ + ns(static_cast<long long>(tick_) * 93960LL / 1000);
+        auto target = start_
+            + ns((long long)((double)tick_ * ns_per_tick_));
         auto now    = std::chrono::steady_clock::now();
         if (now < target)
             std::this_thread::sleep_until(target);
         else if (now - target > std::chrono::milliseconds(250))
-            start_ = now - ns(static_cast<long long>(tick_) * 93960LL / 1000);
+            start_ = now - ns((long long)((double)tick_ * ns_per_tick_));
             // fell behind (window drag, heavy sim stretch): re-anchor
             // instead of racing to catch up
     }
@@ -150,6 +164,7 @@ public:
 private:
     std::chrono::steady_clock::time_point start_;
     uint64_t tick_;
+    double   ns_per_tick_ = 93.96;
 };
 
 // ---------------------------------------------------------------------------
@@ -312,6 +327,7 @@ int main(int argc, char** argv)
     bool        disk_wp[4] = {};
     int         scale      = 2;
     bool        throttle   = false;
+    double      throttle_factor = 1.0;
     bool        debug_pty  = false;
     bool        percom     = true;
     std::string type_text;
@@ -323,6 +339,8 @@ int main(int argc, char** argv)
     std::string cas_path;
     std::string cas_save;
     int         cas_baud = 500;
+    bool        sound    = true;
+    int         volume   = 60;
 
     for (int i = 1; i < argc; i++) {
         std::string a(argv[i]);
@@ -338,6 +356,9 @@ int main(int argc, char** argv)
         else if (a == "--wp3") { disk_wp[3] = true; }
         else if ((v = arg_value(a, "--scale=")) != "") { scale = atoi(v.c_str()); }
         else if (a == "--throttle") { throttle = true; }
+        else if ((v = arg_value(a, "--throttle=")) != "") {
+            throttle = true; throttle_factor = atof(v.c_str());
+        }
         else if (a == "--debug-pty") { debug_pty = true; }
         else if (a == "--no-percom") { percom = false; }
         else if ((v = arg_value(a, "--type=")) != "") { type_text = v; }
@@ -348,6 +369,8 @@ int main(int argc, char** argv)
         else if ((v = arg_value(a, "--cas=")) != "") { cas_path = v; }
         else if ((v = arg_value(a, "--cas-baud=")) != "") { cas_baud = atoi(v.c_str()); }
         else if ((v = arg_value(a, "--cas-save=")) != "") { cas_save = v; }
+        else if (a == "--no-sound") { sound = false; }
+        else if ((v = arg_value(a, "--volume=")) != "") { volume = atoi(v.c_str()); }
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
@@ -376,6 +399,9 @@ int main(int argc, char** argv)
         return 1;
     if (!cas_save.empty())
         cass.record_to(cas_save);
+    EmuAudio audio;
+    if (sound)
+        sound = audio.init(volume);
     EmuKeyboard kbd;
     if (kbd_layout == "de") {
         kbd.set_layout(EmuKeyboard::Layout::DE);
@@ -466,6 +492,7 @@ int main(int argc, char** argv)
     top.fdc_wp   = disk.fdc_wp;
 
     Throttle thr;
+    thr.set_factor(throttle_factor);
 
     // ---- Main simulation loop ----
     bool running = true;
@@ -540,6 +567,10 @@ int main(int argc, char** argv)
         cass.out_ladder = top.cass_out;
         cass.tick();
         top.cass_in = cass.out;
+
+        // --- Program sound: the ladder is the Model 1's only voice ---
+        if (sound)
+            audio.tick(top.cass_out);
 
         // --- Update keyboard matrix (live keyboard + scripted input) ---
         top.keys = kbd.keys() | autotype.keys();

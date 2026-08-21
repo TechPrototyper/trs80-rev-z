@@ -65,7 +65,14 @@ module ulx3s_top (
     // FTDI serial: the debug host link (ADR-0006 D1) — JSON-RPC bridge
     // on the PC, binary protocol v0 on this wire
     input  wire       ftdi_rxd,   // host transmits
-    output wire       ftdi_txd    // host receives
+    output wire       ftdi_txd,   // host receives
+
+    // audio jack (4-bit resistor DACs): program sound = the cassette
+    // output ladder, the Model 1's only voice (M7). Left and right
+    // mirror it for now; the drive sounds (M7 stage 2) take the right
+    // channel when they arrive.
+    output wire [3:0] audio_l,
+    output wire [3:0] audio_r
 );
 
     // ------------------------------------------------------------------
@@ -318,6 +325,15 @@ module ulx3s_top (
         .c1_wq_dat(c1_wq_dat),
         .c1_wq_done(c1_wq_done), .c1_wq_err(c1_wq_err)
     );
+
+    // M7: the ladder on the audio jack — {~Q1,Q0}: 3 = high swing,
+    // 0 = low swing, 2 (and the unused 1) = the resting center. The
+    // jack is AC-coupled listening-side; mid-scale keeps it click-free.
+    wire [3:0] snd_lvl = (cass_out == 2'b11) ? 4'hF
+                       : (cass_out == 2'b00) ? 4'h0
+                       :                       4'h8;
+    assign audio_l = snd_lvl;
+    assign audio_r = snd_lvl;
 
     m1_cass_sd u_cass (
         .clk(clk), .rst_n(por_rst_n),

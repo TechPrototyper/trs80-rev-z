@@ -56,7 +56,7 @@ SDL2_LIBS   := $(shell sdl2-config --libs   2>/dev/null || echo -lSDL2)
 CXXFLAGS_EXTRA := $(SDL2_CFLAGS) -O2 -std=c++17
 LDFLAGS_EXTRA  := $(SDL2_LIBS)
 
-SRCS := main.cpp emu_disk.cpp emu_cass.cpp emu_keyboard.cpp emu_display.cpp
+SRCS := main.cpp emu_disk.cpp emu_cass.cpp emu_audio.cpp emu_keyboard.cpp emu_display.cpp
 
 EMU := build/emu/Vm1_core
 

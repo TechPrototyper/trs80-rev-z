@@ -70,12 +70,14 @@ drives 0–3 only; drive numbers above 3 do not exist.
 | `--disk3=<file>` | (none) | DMK image for drive 3 |
 | `--wp0` … `--wp3` | off | Force write-protect on the drive |
 | `--scale=<n>` | `2` | SDL2 window pixel scale (2 = 768×384, 3 = 1152×576) |
-| `--throttle` | off | Pace simulation to ≈ 10.6 MHz real time |
+| `--throttle[=f]` | off | Pace the simulation: `--throttle` = real time, `--throttle=0.6` = a constant 0.6× machine. The model tops out ≈ 0.75× on current hosts, so pinning a sustainable factor gives a rock-steady pace — and with it rock-steady audio pitch |
 | `--no-ei` | off | 16K machine (no Expansion Interface or FDC) |
 | `--ei16` | off | 32K machine |
 | `--ei32` | **default** | 48K machine (full Expansion Interface) |
 | `--cas=<file>` | (none) | Insert a cassette: `.cas` (pulses synthesized at 500 baud) or `.wav` (Z4 detector: peak-relative threshold + hysteresis + refractory). Motor-gated by port 0xFF D2 |
 | `--cas-baud=<n>` | `500` | Baud rate for `.cas` pulse synthesis |
+| `--no-sound` | off | Disable program sound (default: the cassette output ladder — the Model 1's only voice — plays through SDL audio) |
+| `--volume=<n>` | `60` | Program-sound volume 0–100. Applies to the program channel only; drive sounds (M7 stage 2) will keep a fixed period-correct loudness relative to it |
 | `--cas-save=<file>` | (none) | Record what the machine writes: each motor-on stretch is decoded (500 baud) and saved as `.cas` bytes or a synthesized `.wav`; later saves get `-1`, `-2`, … suffixes |
 | `--kbd=<layout>` | `us` | Host keyboard layout (`us` or `de`) — scancodes are physical, so this decides which legend a key produces (QWERTZ swaps Y/Z, `:` sits on shift+`.`, …) |
 | `--debug-pty` | off | Expose the `m1_debug` binary-v0 link on a pseudo-tty |
