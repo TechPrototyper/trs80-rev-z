@@ -31,9 +31,16 @@ public:
 
     bool loaded() const { return !pulses_.empty(); }
 
+    // Record what the machine writes. The positive ladder spike
+    // (cass_out == 3) marks a pulse; on every motor stop with enough
+    // pulses captured the stream is decoded at 500 baud and written to
+    // <path> (.cas byte stream, or .wav with synthesized pulses).
+    void record_to(const std::string& path) { save_path_ = path; }
+
     // --- per-tick interface ---
-    uint8_t motor = 0;        // in: cassette relay (m1_core.cass_motor)
-    uint8_t out   = 0;        // out: cass_in level for m1_core
+    uint8_t motor      = 0;   // in: cassette relay (m1_core.cass_motor)
+    uint8_t out_ladder = 0;   // in: cass_out level (write side)
+    uint8_t out        = 0;   // out: cass_in level for m1_core
 
     void tick();
 
@@ -43,6 +50,14 @@ private:
     uint64_t pos_us_  = 0;
     int      high_us_ = 0;
     uint32_t acc_     = 0;           // 1 MHz phase accumulator
+
+    std::string           save_path_;
+    std::vector<uint64_t> wr_pulses_;
+    uint8_t  ladder_d_ = 2;          // idle center
+    uint8_t  motor_d_  = 0;
+    int      saves_    = 0;
+
+    void flush_recording();
 
     static constexpr int      PULSE_US = 50;
     static constexpr uint32_t ACC_K    = 1576139;  // 2^24 / 10.6445

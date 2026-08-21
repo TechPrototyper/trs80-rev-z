@@ -136,9 +136,13 @@ content and *more* faithful than the reference at the one bit where they differ
 
 ## 8. Open items
 
-- [ ] **Cassette analog path (M2).** Z4 filter/rectifier/level-detector →
-      cassette-input edges; the 2-bit output ladder and motor consumer; `.cas`
-      loading from SD. The digital register is ready for all of it.
+- [ ] **Cassette analog path (M2).** *Mostly closed 2026-08-21:* the Z4
+      filter/rectifier/level-detector is modeled in the media layer (where the
+      analog half lives — `cass_media_model.sv`, `emu_cass.cpp`: peak-relative
+      threshold, hysteresis, refractory); the output ladder + motor are
+      consumed by the recorder side; read and write are golden-verified
+      (`make golden-cass`, `golden-cass-wr`) and round-trip byte-exact
+      through WAV. Still open: `.cas`/WAV from the **SD card** on the board.
 - [ ] **32-char display golden check.** The mode *switch* is golden-verified via
       the D6 read-back; the doubled-width *rendering* is verified per-dot in the
       video benches (chapters 1–3, both modes) but not yet screenshot-compared to

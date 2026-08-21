@@ -117,13 +117,22 @@ VRAM comparison against trs80gp, then on the ULX3S over HDMI with a USB keyboard
       trs80gp's deck, byte-exact) and the acceptance form — Space Invaders'
       500-baud **WAV** loaded via Level II `SYSTEM`, all 15 records
       byte-exact in RAM (Z4 detector in the media layer, `emu --cas=`).*
-- [ ] BASIC round-trip: `CSAVE` writes a WAV, `CLOAD` reads it back
-      byte-exact (write path, too — no assembly-only corpus covers this)
-- [ ] TBUG/`SYSTEM` round-trip: a TBUG-written machine-code tape (SYSTEM
+- [X] BASIC round-trip: `CSAVE` writes a WAV, `CLOAD` reads it back
+      byte-exact (write path, too — no assembly-only corpus covers this).
+      *Verified 2026-08-21: CSAVE→.cas→CLOAD→CSAVE→.wav→CLOAD (Z4
+      detector)→CSAVE→.cas — first and last file byte-identical (276
+      bytes incl. the 255-byte leader). Write pulses golden-pinned:
+      `make golden-cass-wr` — trs80gp's auto-save decodes our RTL's
+      pulse stream to the identical bytes.*
+- [X] TBUG/`SYSTEM` round-trip: a TBUG-written machine-code tape (SYSTEM
       format, distinct from BASIC's tokenized format) loads via BASIC's
       `SYSTEM` command — the executable-loading path most period software
-      actually shipped on
-- [ ] Acceptance test: a known-good machine-language game loads from virtual tape
+      actually shipped on. *Verified 2026-08-21 with a zmac-built SYSTEM
+      tape (same format): all 15 records byte-exact in RAM after
+      `SYSTEM`/`SPACEI` (500-baud WAV).*
+- [X] Acceptance test: a known-good machine-language game loads from virtual
+      tape. *Space Invaders (assembly corpus, 500-baud WAV) via Level II
+      `SYSTEM`, 2026-08-21.*
 
 ### M3 — Expansion Interface & floppy (the long pole)
 

@@ -1,17 +1,18 @@
-// Testbench: cassette read path through port 0xFF (M2 stage 1).
+// Testbench: cassette WRITE path through port 0xFF (M2 stage 2).
 //
-// Boots the cassette probe (tools/build_cass_test.py) on m1_core with
-// the 500-baud test tape (+cas=build/casstape_pulses.hex from
-// tools/build_cas.py) in the deck model. The probe turns the motor on,
-// bit-syncs on the leader, waits for the 0xA5 sync byte and captures 16
-// payload bytes purely by polling D7 of port 0xFF — the Z24 input latch
-// with its OUT-resets is the device under test. The bench checks the
-// tags and dumps the VRAM for the byte-exact golden compare
-// (make golden-cass: trs80gp -c with the same .cas byte stream).
+// Boots the write probe (tools/build_cass_wr_test.py): it bit-bangs an
+// 8-byte leader, the 0xA5 sync and the 16-byte payload at 500 baud
+// through the output ladder (OUT 01/02/00 pulse swings, motor held).
+// The deck model records every positive spike; +caswr dumps the
+// timestamps and tools/check_cass_write.py decodes them back to bytes
+// — the round-trip proof that what the RTL puts on tape is the stream
+// the probe meant to write. VRAM golden vs trs80gp: make
+// golden-cass-wr additionally diffs trs80gp''s auto-saved .cas against
+// our decode from the A5 sync on.
 
 `timescale 1ns / 1ps
 
-module tb_m1_cass;
+module tb_m1_cass_wr;
 
     logic clk, rst_n;
     initial begin clk = 0; rst_n = 0; end
@@ -62,7 +63,7 @@ module tb_m1_cass;
     );
 
     logic [7:0] image [0:4095];
-    initial $readmemh("build/casstest.hex", image);
+    initial $readmemh("build/casswtest.hex", image);
 
     bit checks_on, done;
     initial begin checks_on = 0; done = 0; end
@@ -107,20 +108,19 @@ module tb_m1_cass;
         wait (done);
         repeat (8) @(negedge clk);
 
-        expect_row(10'd0, "CA", "banner");
-        expect_row(10'd4, "0714212E3B4855626F7C8996A3B0BDCA88",
-                   "row 0 (16 payload bytes + checksum)");
+        expect_row(10'd0, "CW", "banner");
+        expect_row(10'd4, "88", "row 0 (payload checksum)");
 
         if (errors == 0)
-            $display("  ok  leader sync + 16 bytes decoded off the tape");
+            $display("  ok  probe wrote the full stream (checksum 88)");
 
-        fd = $fopen("build/vram_cass.bin", "wb");
+        fd = $fopen("build/vram_cass_wr.bin", "wb");
         for (i = 0; i < 1024; i++)
             $fwrite(fd, "%c", vram_byte(10'(i)));
         $fclose(fd);
-        $display("  ok  VRAM dumped: build/vram_cass.bin");
+        $display("  ok  VRAM dumped: build/vram_cass_wr.bin");
 
-        if (errors == 0) $display("ALL CHECKS PASSED (cassette read)");
+        if (errors == 0) $display("ALL CHECKS PASSED (cassette write)");
         else             $display("%0d CHECKS FAILED", errors);
         if (errors != 0) $fatal(1);
         $finish;
@@ -128,7 +128,7 @@ module tb_m1_cass;
 
     initial begin
         #8_000_000_000;
-        $fatal(1, "watchdog: cassette test did not reach the marker");
+        $fatal(1, "watchdog: cassette write test did not reach the marker");
     end
 
 endmodule

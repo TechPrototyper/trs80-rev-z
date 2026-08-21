@@ -191,6 +191,8 @@ void EmuKeyboard::rebuild()
     int numkeys = 0;
     const Uint8* st = SDL_GetKeyboardState(&numkeys);
 
+    reset_ = numkeys > SDL_SCANCODE_F12 && st[SDL_SCANCODE_F12];
+
     bool lshift = numkeys > SDL_SCANCODE_LSHIFT && st[SDL_SCANCODE_LSHIFT];
     bool rshift = numkeys > SDL_SCANCODE_RSHIFT && st[SDL_SCANCODE_RSHIFT];
     bool phys_shift = lshift || rshift;

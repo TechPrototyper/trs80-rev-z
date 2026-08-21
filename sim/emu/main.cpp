@@ -321,6 +321,7 @@ int main(int argc, char** argv)
     int         enter_until = 0;  // hold ENTER until this frame (boot skips)
     std::string kbd_layout = "us";
     std::string cas_path;
+    std::string cas_save;
     int         cas_baud = 500;
 
     for (int i = 1; i < argc; i++) {
@@ -346,6 +347,7 @@ int main(int argc, char** argv)
         else if ((v = arg_value(a, "--kbd=")) != "") { kbd_layout = v; }
         else if ((v = arg_value(a, "--cas=")) != "") { cas_path = v; }
         else if ((v = arg_value(a, "--cas-baud=")) != "") { cas_baud = atoi(v.c_str()); }
+        else if ((v = arg_value(a, "--cas-save=")) != "") { cas_save = v; }
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
@@ -372,6 +374,8 @@ int main(int argc, char** argv)
     EmuCassette cass;
     if (!cas_path.empty() && !cass.load(cas_path, cas_baud))
         return 1;
+    if (!cas_save.empty())
+        cass.record_to(cas_save);
     EmuKeyboard kbd;
     if (kbd_layout == "de") {
         kbd.set_layout(EmuKeyboard::Layout::DE);
@@ -532,12 +536,14 @@ int main(int argc, char** argv)
         top.trk_wb_err   = disk.trk_wb_err;
 
         // --- Cassette deck: motor-gated tape into cass_in ---
-        cass.motor  = top.cass_motor;
+        cass.motor      = top.cass_motor;
+        cass.out_ladder = top.cass_out;
         cass.tick();
         top.cass_in = cass.out;
 
         // --- Update keyboard matrix (live keyboard + scripted input) ---
         top.keys = kbd.keys() | autotype.keys();
+        top.reset_btn_n = kbd.reset_pressed() ? 0 : 1;   // F12 = RESET button
         if (framecnt < (uint64_t)enter_until)
             top.keys |= uint64_t(1) << (6 * 8 + 0);   // hold ENTER (row 6 bit 0)
 

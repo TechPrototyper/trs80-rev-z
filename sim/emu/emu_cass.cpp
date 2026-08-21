@@ -146,4 +146,92 @@ void EmuCassette::tick()
     } else if (high_us_ > 0)
         high_us_--;
     out = (high_us_ > 0) ? 1 : 0;
+
+    // recorder: positive ladder spikes while the motor runs
+    if (!save_path_.empty()) {
+        if (motor && out_ladder == 3 && ladder_d_ != 3)
+            wr_pulses_.push_back(pos_us_);
+        ladder_d_ = out_ladder;
+        if (!motor && motor_d_ && wr_pulses_.size() > 16)
+            flush_recording();             // one save = motor-on stretch
+        motor_d_ = motor;
+    }
+}
+
+void EmuCassette::flush_recording()
+{
+    // pulse gaps -> bits (the golden-pinned 500-baud rule: a pulse
+    // < 1.5 ms after a clock is a data '1')
+    std::vector<int> bits;
+    for (size_t i = 0; i + 1 < wr_pulses_.size();) {
+        if (wr_pulses_[i + 1] - wr_pulses_[i] < 1500) {
+            bits.push_back(1);
+            i += 2;
+        } else {
+            bits.push_back(0);
+            i += 1;
+        }
+    }
+    for (int k = 0; k < 16; k++) bits.push_back(0);   // final byte pad
+
+    std::vector<uint8_t> bytes;
+    for (size_t k = 0; k + 8 <= bits.size(); k += 8) {
+        uint8_t b = 0;
+        for (int j = 0; j < 8; j++)
+            b = (uint8_t)((b << 1) | bits[k + j]);
+        bytes.push_back(b);
+    }
+
+    std::string path = save_path_;
+    if (saves_ > 0) {                      // second save: -1, -2, ...
+        size_t dot = path.rfind('.');
+        char tag[8];
+        snprintf(tag, sizeof tag, "-%d", saves_);
+        path = (dot == std::string::npos)
+               ? path + tag
+               : path.substr(0, dot) + tag + path.substr(dot);
+    }
+
+    size_t dot = path.rfind('.');
+    std::string ext = (dot == std::string::npos) ? "" : path.substr(dot);
+    for (auto& c : ext) c = (char)tolower(c);
+
+    FILE* f = fopen(path.c_str(), "wb");
+    if (!f) { fprintf(stderr, "emu_cass: cannot write %s\n", path.c_str()); }
+    else if (ext == ".wav") {
+        // 44100 Hz mono 8-bit: a +/- spike per pulse, center elsewhere
+        const uint32_t rate = 44100;
+        uint64_t dur = wr_pulses_.back() + 5000;
+        uint32_t nsamp = (uint32_t)(dur * rate / 1000000ULL);
+        std::vector<uint8_t> pcm(nsamp, 128);
+        for (uint64_t t : wr_pulses_) {
+            uint32_t s0 = (uint32_t)(t * rate / 1000000ULL);
+            for (uint32_t k = 0; k < rate / 10000 && s0 + k < nsamp; k++)
+                pcm[s0 + k] = 240;                     // ~100 us positive
+            for (uint32_t k = rate / 10000;
+                 k < rate / 5000 && s0 + k < nsamp; k++)
+                pcm[s0 + k] = 16;                      // ~100 us negative
+        }
+        uint32_t dlen = nsamp, flen = 36 + dlen;
+        uint8_t hdr[44] = {'R','I','F','F',0,0,0,0,'W','A','V','E',
+                           'f','m','t',' ',16,0,0,0, 1,0, 1,0,
+                           0,0,0,0, 0,0,0,0, 1,0, 8,0,
+                           'd','a','t','a',0,0,0,0};
+        memcpy(hdr + 4,  &flen, 4);
+        memcpy(hdr + 24, &rate, 4);
+        memcpy(hdr + 28, &rate, 4);
+        memcpy(hdr + 40, &dlen, 4);
+        fwrite(hdr, 1, 44, f);
+        fwrite(pcm.data(), 1, pcm.size(), f);
+        fclose(f);
+    } else {
+        fwrite(bytes.data(), 1, bytes.size(), f);
+        fclose(f);
+    }
+    if (f)
+        fprintf(stderr,
+                "emu_cass: saved %zu pulses -> %zu bytes -> %s\n",
+                wr_pulses_.size(), bytes.size(), path.c_str());
+    saves_++;
+    wr_pulses_.clear();
 }

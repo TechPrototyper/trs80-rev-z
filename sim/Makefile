@@ -31,7 +31,7 @@ YOSYS     ?= yosys
 all: run
 
 # build + run every testbench
-run: $(BINS) build/tb_m1_ram48/Vtb_m1_ram48 build/tb_m1_ei_hb/Vtb_m1_ei_hb build/tb_m1_fdc_sys/Vtb_m1_fdc_sys build/tb_m1_fdc_rd/Vtb_m1_fdc_rd build/tb_m1_fdc_dam/Vtb_m1_fdc_dam build/tb_m1_fdc_ds/Vtb_m1_fdc_ds build/tb_m1_cass/Vtb_m1_cass build/tb_m1_fdc_wr/Vtb_m1_fdc_wr build/tb_m1_fdc_trk/Vtb_m1_fdc_trk build/tb_m1_fdc_dd/Vtb_m1_fdc_dd build/tb_m1_debug/Vtb_m1_debug build/fdc_disk.hex build/fdc_disk_wp.hex build/fdc_disk_dd.hex build/fdc_dam_disk.hex build/fdc_ds_disk.hex build/casstape_pulses.hex
+run: $(BINS) build/tb_m1_ram48/Vtb_m1_ram48 build/tb_m1_ei_hb/Vtb_m1_ei_hb build/tb_m1_fdc_sys/Vtb_m1_fdc_sys build/tb_m1_fdc_rd/Vtb_m1_fdc_rd build/tb_m1_fdc_dam/Vtb_m1_fdc_dam build/tb_m1_fdc_ds/Vtb_m1_fdc_ds build/tb_m1_cass/Vtb_m1_cass build/tb_m1_cass_wr/Vtb_m1_cass_wr build/tb_m1_fdc_wr/Vtb_m1_fdc_wr build/tb_m1_fdc_trk/Vtb_m1_fdc_trk build/tb_m1_fdc_dd/Vtb_m1_fdc_dd build/tb_m1_debug/Vtb_m1_debug build/fdc_disk.hex build/fdc_disk_wp.hex build/fdc_disk_dd.hex build/fdc_dam_disk.hex build/fdc_ds_disk.hex build/casstape_pulses.hex
 	@set -e; for tb in $(TBS); do \
 	  echo "=== $$tb ==="; build/$$tb/V$$tb; \
 	done
@@ -57,6 +57,9 @@ run: $(BINS) build/tb_m1_ram48/Vtb_m1_ram48 build/tb_m1_ei_hb/Vtb_m1_ei_hb build
 	@build/tb_m1_fdc_ds/Vtb_m1_fdc_ds +dmk=build/fdc_ds_disk.hex
 	@echo "=== tb_m1_cass (500-baud cassette read via port 0xFF) ==="
 	@build/tb_m1_cass/Vtb_m1_cass +cas=build/casstape_pulses.hex
+	@echo "=== tb_m1_cass_wr (500-baud cassette write round trip) ==="
+	@build/tb_m1_cass_wr/Vtb_m1_cass_wr +caswr=build/casswrite_pulses.txt
+	@python3 tools/check_cass_write.py build/casswrite_pulses.txt
 	@echo "=== tb_m1_fdc_wr (write + flush round trip) ==="
 	@build/tb_m1_fdc_wr/Vtb_m1_fdc_wr +dmk=build/fdc_disk.hex
 	@python3 tools/check_dmk_write.py build/written_dmk.hex 2 3
@@ -139,6 +142,10 @@ build/casstest.hex: tools/build_cass_test.py
 	@mkdir -p build
 	cd . && python3 tools/build_cass_test.py
 
+build/casswtest.hex: tools/build_cass_wr_test.py
+	@mkdir -p build
+	cd . && python3 tools/build_cass_wr_test.py
+
 build/casstape_pulses.hex: tools/build_cas.py
 	@mkdir -p build
 	python3 tools/build_cas.py --out build/casstape
@@ -212,6 +219,11 @@ build/tb_m1_cass/Vtb_m1_cass: tb_m1_cass.sv cass_media_model.sv ../rtl/m1_core.v
 	@mkdir -p build/tb_m1_cass
 	$(VERILATOR) $(VFLAGS) --Mdir build/tb_m1_cass -o Vtb_m1_cass \
 	  --top-module tb_m1_cass tb_m1_cass.sv cass_media_model.sv ../rtl/m1_core.v $(RTL) $(CPU_RTL) ../rtl/m1_io.v ../rtl/m1_keyboard.v
+
+build/tb_m1_cass_wr/Vtb_m1_cass_wr: tb_m1_cass_wr.sv cass_media_model.sv ../rtl/m1_core.v $(RTL) $(CPU_RTL) ../rtl/m1_io.v ../rtl/m1_keyboard.v ../rtl/mcm6670_cg1.hex build/casswtest.hex
+	@mkdir -p build/tb_m1_cass_wr
+	$(VERILATOR) $(VFLAGS) --Mdir build/tb_m1_cass_wr -o Vtb_m1_cass_wr \
+	  --top-module tb_m1_cass_wr tb_m1_cass_wr.sv cass_media_model.sv ../rtl/m1_core.v $(RTL) $(CPU_RTL) ../rtl/m1_io.v ../rtl/m1_keyboard.v
 
 build/tb_m1_fdc_sys/Vtb_m1_fdc_sys: tb_m1_fdc_sys.sv ../rtl/m1_core.v $(RTL) $(CPU_RTL) ../rtl/m1_io.v ../rtl/m1_keyboard.v ../rtl/mcm6670_cg1.hex build/fdctest.hex
 	@mkdir -p build/tb_m1_fdc_sys
@@ -466,6 +478,27 @@ open('build/casstest12k.bin','wb').write(d + b'\0'*(12288-len(d)))"
 	  -id 600 -it -ix >/dev/null 2>&1
 	@mv build/trs80-text-0.bin build/trs80-text-cass.bin
 	@python3 tools/compare_vram.py build/trs80-text-cass.bin build/vram_cass.bin
+
+# Golden check for the cassette write path: the same write-probe ROM in
+# trs80gp with cassette auto-save; trs80gp's own decoder turns the
+# probe's pulses into a .cas — its bytes from the A5 sync on must equal
+# what our deck model decoded from the RTL's pulses.
+golden-cass-wr: build/tb_m1_cass_wr/Vtb_m1_cass_wr build/casswtest.hex
+	@build/tb_m1_cass_wr/Vtb_m1_cass_wr +caswr=build/casswrite_pulses.txt >/dev/null
+	@python3 tools/check_cass_write.py build/casswrite_pulses.txt
+	@test -x "$(TRS80GP)" || { echo "set TRS80GP to the trs80gp binary"; exit 2; }
+	@python3 -c "d=open('build/casswtest.bin','rb').read(); \
+open('build/casswtest12k.bin','wb').write(d + b'\0'*(12288-len(d)))"
+	@rm -f build/trs80-text-0.bin build/trs80-cassette-0.cas
+	@cd build && "$(TRS80GP)" -m1 -mem 48 -dx -rom casswtest12k.bin -cs -turbo -batch \
+	  -id 600 -it -ix >/dev/null 2>&1
+	@mv build/trs80-text-0.bin build/trs80-text-cass-wr.bin
+	@python3 tools/compare_vram.py build/trs80-text-cass-wr.bin build/vram_cass_wr.bin
+	@python3 -c "import sys; d=open('build/trs80-cassette-0.cas','rb').read(); \
+i=d.find(0xA5); exp=bytes([0xA5]+[(t*13+7)&0xFF for t in range(16)]); \
+got=d[i:i+len(exp)] if i>=0 else b''; \
+print('MATCH  trs80gp auto-save agrees from sync on:', got.hex()) if got==exp \
+else (print('FAIL  trs80gp auto-save:', d.hex()), sys.exit(1))"
 
 # render the simulated frames as PNGs (4x, roughly CRT-ish aspect)
 frames: run

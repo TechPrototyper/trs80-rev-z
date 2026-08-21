@@ -75,6 +75,7 @@ drives 0–3 only; drive numbers above 3 do not exist.
 | `--ei32` | **default** | 48K machine (full Expansion Interface) |
 | `--cas=<file>` | (none) | Insert a cassette: `.cas` (pulses synthesized at 500 baud) or `.wav` (Z4 detector: peak-relative threshold + hysteresis + refractory). Motor-gated by port 0xFF D2 |
 | `--cas-baud=<n>` | `500` | Baud rate for `.cas` pulse synthesis |
+| `--cas-save=<file>` | (none) | Record what the machine writes: each motor-on stretch is decoded (500 baud) and saved as `.cas` bytes or a synthesized `.wav`; later saves get `-1`, `-2`, … suffixes |
 | `--kbd=<layout>` | `us` | Host keyboard layout (`us` or `de`) — scancodes are physical, so this decides which legend a key produces (QWERTZ swaps Y/Z, `:` sits on shift+`.`, …) |
 | `--debug-pty` | off | Expose the `m1_debug` binary-v0 link on a pseudo-tty |
 | `--pctrace=lo:hi:file` | off | Log every instruction-fetch PC in `[lo,hi]` (hex) to *file*, one `@xxxx` line each — diffable against `trs80gp -tr lo:hi` (this is how the NEWDOS lookup and aj6 boot divergences were root-caused) |
@@ -123,7 +124,8 @@ position-faithful.
 | Shift+`;` | : (unshifted) |
 
 Keys with no Model I equivalent (`^`, `_`, `[`, `]`, `\`) are silently
-ignored.
+ignored. **F12** presses the front-panel RESET button (held = the Z80
+reset line grounded, like the real button on the keyboard unit).
 
 The matrix is rebuilt from the complete SDL keyboard state once per
 frame ("current report wins" — the same architecture as

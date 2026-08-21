@@ -41,9 +41,14 @@ public:
     // Returns the current 64-bit key matrix for m1_core.keys.
     uint64_t keys() const { return keys_; }
 
+    // F12 = the front-panel RESET button (m1_core.reset_btn_n, active
+    // while held — the real button grounds the Z80 reset line).
+    bool reset_pressed() const { return reset_; }
+
 private:
     uint64_t keys_;
     Layout   layout_ = Layout::US;
+    bool     reset_  = false;
 
     // (shift, HID scancode) -> matrix cell with optional shift override;
     // transcribed from m1_hid_keys.v map_key. Returns false if the glyph
