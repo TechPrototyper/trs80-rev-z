@@ -342,6 +342,7 @@ int main(int argc, char** argv)
     bool        sound    = true;
     int         volume   = 60;
     std::string sound_dump;
+    bool        drive_sounds = true;
 
     for (int i = 1; i < argc; i++) {
         std::string a(argv[i]);
@@ -373,6 +374,7 @@ int main(int argc, char** argv)
         else if (a == "--no-sound") { sound = false; }
         else if ((v = arg_value(a, "--volume=")) != "") { volume = atoi(v.c_str()); }
         else if ((v = arg_value(a, "--sound-dump=")) != "") { sound_dump = v; }
+        else if (a == "--no-drive-sounds") { drive_sounds = false; }
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
@@ -406,6 +408,7 @@ int main(int argc, char** argv)
         sound = audio.init(volume);
     if (sound && !sound_dump.empty())
         audio.dump_to(sound_dump);
+    audio.set_drive_sounds(drive_sounds);
     EmuKeyboard kbd;
     if (kbd_layout == "de") {
         kbd.set_layout(EmuKeyboard::Layout::DE);
@@ -572,9 +575,9 @@ int main(int argc, char** argv)
         cass.tick();
         top.cass_in = cass.out;
 
-        // --- Program sound: the ladder is the Model 1's only voice ---
+        // --- Sound: the ladder (program) + the drive-event stream ---
         if (sound)
-            audio.tick(top.cass_out);
+            audio.tick(top.cass_out, top.snd, disk.fdc_disk);
 
         // --- Update keyboard matrix (live keyboard + scripted input) ---
         top.keys = kbd.keys() | autotype.keys();

@@ -5,6 +5,7 @@
 #include <SDL.h>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <cstdlib>
 
 bool EmuAudio::init(int volume_percent)
@@ -103,8 +104,46 @@ bool EmuAudio::dump_to(const std::string& path)
     return true;
 }
 
-void EmuAudio::tick(uint8_t ladder)
+// One drive-sound sample: motor voices for every spinning drive plus
+// the step click of the selected one. Fixed loudness by design.
+float EmuAudio::drive_mix()
 {
+    static const float detune[4] = {1.000f, 0.972f, 1.031f, 0.988f};
+    float out = 0.0f;
+    for (int d = 0; d < 4; d++) {
+        // white noise (xorshift), reused by both voices
+        rng_ ^= rng_ << 13; rng_ ^= rng_ >> 17; rng_ ^= rng_ << 5;
+        float noise = (float)(int32_t)rng_ * (1.0f / 2147483648.0f);
+
+        if (menv_[d] > 0.001f) {
+            // run-out drops the pitch with the envelope — the spindle
+            // audibly winds down after the 3 s motor one-shot expires
+            float pitch = detune[d] * (0.55f + 0.45f * menv_[d]);
+            hum_ph_[d] += 2.0f * (float)M_PI * 96.0f * pitch / 44100.0f;
+            if (hum_ph_[d] > 2.0f * (float)M_PI)
+                hum_ph_[d] -= 2.0f * (float)M_PI;
+            rumble_[d] += 0.035f * pitch * (noise - rumble_[d]);
+            out += (0.55f * rumble_[d] + 0.20f * sinf(hum_ph_[d]))
+                   * menv_[d];
+        }
+        if (click_[d] > 0.001f) {
+            out += noise * click_[d];
+            click_[d] *= 0.992f;             // ~3 ms decay
+        }
+    }
+    return out;
+}
+
+void EmuAudio::tick(uint8_t ladder, uint8_t snd, uint8_t disks)
+{
+    // step pulses last one dot clock — latch them before the 1 MHz gate
+    if (drives_on_ && (snd & 0x02)) {
+        uint8_t sel = (snd >> 3) & 0xF;
+        int d = (sel & 1) ? 0 : (sel & 2) ? 1 : (sel & 4) ? 2 : 3;
+        if (sel)
+            step_pend_[d] = true;
+    }
+
     uint32_t a = acc_ + ACC_K;
     acc_ = a & 0xFFFFFF;
     if (!(a >> 24))
@@ -116,6 +155,23 @@ void EmuAudio::tick(uint8_t ladder)
         return;
     sample_acc_ -= period_us_;
 
+    // motor envelopes: ~0.35 s spin-up, ~0.9 s run-out; every drive
+    // with a disk hangs on the one shared motor line
+    bool motor = (snd & 0x04) != 0;
+    for (int d = 0; d < 4; d++) {
+        if (drives_on_ && motor && (disks & (1 << d))) {
+            menv_[d] += 6.5e-5f * (1.2f - menv_[d]);   // ~0.35 s spin-up
+            if (menv_[d] > 1.0f) menv_[d] = 1.0f;
+        } else {
+            menv_[d] -= 2.5e-5f;           // ~0.9 s run-out
+            if (menv_[d] < 0.0f) menv_[d] = 0.0f;
+        }
+        if (step_pend_[d]) {
+            step_pend_[d] = false;
+            click_[d] = 0.9f;
+        }
+    }
+
     // DC-blocking one-pole high-pass (fc ~ 20 Hz at 44.1 kHz)
     float x = level(ladder);
     float y = 0.997f * (y_prev_ + x - x_prev_);
@@ -125,7 +181,10 @@ void EmuAudio::tick(uint8_t ladder)
     float fade = (total_samples_ < 44100)
                  ? (float)total_samples_ / 44100.0f : 1.0f;
     total_samples_++;
-    push(y * vol_ * fade * fade);
+    float mix = y * vol_ + (drives_on_ ? drive_mix() * 0.30f : 0.0f);
+    if (mix > 1.0f)  mix = 1.0f;
+    if (mix < -1.0f) mix = -1.0f;
+    push(mix * fade * fade);
 
     // Pitch comes from a MEASUREMENT, not a queue controller: every
     // ~1/8 wall second the emulated-vs-wall pace is sampled and folded

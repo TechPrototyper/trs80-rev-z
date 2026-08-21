@@ -49,7 +49,7 @@ module tb_dbg_uart;
         .trk_wb_data(),
         .cass_out(), .cass_motor(), .hdrv(), .vdrv(), .dot_en(),
         .cpu_cen(), .modesel(), .addr(), .m1_n(), .halt_n(),
-        .pixel(), .col(), .line(), .row()
+        .pixel(), .col(), .line(), .row(), .snd()
         /* verilator lint_on PINCONNECTEMPTY */
     );
 

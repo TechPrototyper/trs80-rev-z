@@ -12,9 +12,13 @@
 // pitch drops by exactly the same factor — the machine you hear is the
 // machine you see, never a resampled idealization of it.
 //
-// Volume applies to the PROGRAM sound only; the drive sounds that
-// arrive with M7 stage 2 keep their fixed, period-correct loudness
-// relative to it.
+// Volume applies to the PROGRAM sound only; the drive sounds keep a
+// fixed, period-correct loudness relative to it (M7 stage 2): four
+// synthesized voices driven by the m1_drives event stream — motor
+// spin-up/run/run-out per drive with a small per-drive detune (real
+// drives never sounded identical), and a step click per head pulse.
+// All drives with a disk spin together, exactly like the shared motor
+// line of the real cable.
 
 #pragma once
 #include <cstdint>
@@ -32,9 +36,12 @@ public:
     // Mirror everything the speaker gets into a 44.1 kHz mono WAV.
     bool dump_to(const std::string& path);
 
-    // Call once per rising dot-clock edge with the ladder level
-    // (m1_core.cass_out).
-    void tick(uint8_t ladder);
+    // Call once per rising dot-clock edge. ladder = m1_core.cass_out;
+    // snd = m1_core.snd {DS latch[3:0], motor, step, dirc};
+    // disks = media-present mask (drive sounds need a disk to spin).
+    void tick(uint8_t ladder, uint8_t snd, uint8_t disks);
+
+    void set_drive_sounds(bool on) { drives_on_ = on; }
 
 private:
     uint32_t dev_ = 0;
@@ -57,6 +64,17 @@ private:
 
     FILE*    dump_   = nullptr;
     uint32_t dump_n_ = 0;
+
+    // drive-sound voices
+    bool     drives_on_ = true;
+    float    menv_[4]   = {0, 0, 0, 0};    // motor envelope per drive
+    float    hum_ph_[4] = {0, 0, 0, 0};
+    float    rumble_[4] = {0, 0, 0, 0};    // low-passed noise state
+    float    click_[4]  = {0, 0, 0, 0};    // step-click envelope
+    bool     step_pend_[4] = {false, false, false, false};
+    uint32_t rng_ = 0x2626C3A5;
+
+    float drive_mix();
 
     float  x_prev_ = 0.0f;                 // DC-blocker state
     float  y_prev_ = 0.0f;

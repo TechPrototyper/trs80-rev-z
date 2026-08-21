@@ -61,7 +61,7 @@ module tb_m1_fdc_ds;
         /* verilator lint_off PINCONNECTEMPTY */
         .cass_out(), .cass_motor(), .hdrv(), .vdrv(), .dot_en(),
         .cpu_cen(), .modesel(), .addr(), .m1_n(), .halt_n(),
-        .pixel(), .col(), .line(), .row()
+        .pixel(), .col(), .line(), .row(), .snd()
         /* verilator lint_on PINCONNECTEMPTY */
     );
 

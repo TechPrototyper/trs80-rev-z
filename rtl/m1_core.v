@@ -81,6 +81,12 @@ module m1_core #(
     output wire [1:0]  cass_out,
     output wire        cass_motor,
 
+    // drive-sound event stream (M7): the m1_drives boundary events the
+    // board's or emulator's sound engine consumes — {DS latch [3:0],
+    // motor one-shot, step pulse, step direction}. Pure observability;
+    // unread it costs nothing.
+    output wire [6:0]  snd,
+
     // video output
     output wire        pixel,        // serial dot stream
     output wire        hdrv,         // horizontal drive (blank/sync source)
@@ -316,9 +322,9 @@ module m1_core #(
     // status lines the board may leave unread (some are watched only by the
     // testbench, hierarchically); the EI drive/motor/1MHz outputs are
     // consumed by the FDC in EI stage 2
+    assign snd = {ei_drive_sel, ei_motor_on, ei_step, ei_dirc};
+
     wire _unused_ok = &{1'b0, addr_en, dbin_n, intak_n, sysres_n,
-                        mux, cas_n, busak_n, outsig_n,
-                        ei_drive_sel, ei_motor_on, ei_en_1m,
-                        ei_step, ei_dirc};
+                        mux, cas_n, busak_n, outsig_n, ei_en_1m};
 
 endmodule

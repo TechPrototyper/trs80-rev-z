@@ -426,6 +426,9 @@ module ulx3s_top (
         .cass_in     (cass_in_w),     // SD cassette deck (M2)
         .cass_out    (cass_out),
         .cass_motor  (cass_motor),
+        /* verilator lint_off PINCONNECTEMPTY */
+        .snd         (),              // drive-sound events: M7 stage 2
+        /* verilator lint_on PINCONNECTEMPTY */
 
         .pixel       (pixel),
         .hdrv        (hdrv),

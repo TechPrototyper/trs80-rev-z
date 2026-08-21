@@ -92,7 +92,7 @@ module tb_m1_cpu;
         .cass_in(1'b0),
         /* verilator lint_off PINCONNECTEMPTY */
         .cass_out(), .cass_motor(cass_motor),
-        .hdrv(), .vdrv(), .dot_en(), .cpu_cen(),
+        .hdrv(), .vdrv(), .dot_en(), .cpu_cen(), .snd(),
         /* verilator lint_on PINCONNECTEMPTY */
         .pixel(pixel),
         .modesel(modesel), .col(col), .line(line), .row(row),

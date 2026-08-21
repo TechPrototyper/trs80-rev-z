@@ -53,7 +53,7 @@ module tb_m1_cass_wr;
         /* verilator lint_off PINCONNECTEMPTY */
         .hdrv(), .vdrv(), .dot_en(),
         .cpu_cen(), .modesel(), .addr(), .m1_n(), .halt_n(),
-        .pixel(), .col(), .line(), .row()
+        .pixel(), .col(), .line(), .row(), .snd()
         /* verilator lint_on PINCONNECTEMPTY */
     );
 
