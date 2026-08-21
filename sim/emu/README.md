@@ -92,6 +92,21 @@ drives 0–3 only; drive numbers above 3 do not exist.
 | `--pctrace=lo:hi:file` | off | Log every instruction-fetch PC in `[lo,hi]` (hex) to *file*, one `@xxxx` line each — diffable against `trs80gp -tr lo:hi` (this is how the NEWDOS lookup and aj6 boot divergences were root-caused) |
 | `--enter-until=<frame>` | off | Hold ENTER from power-on until the given frame (some DOS mods skip boot prompts on a held ENTER) |
 
+## Quick start
+
+```
+sim/emu/run.sh                       # boot to Level II BASIC
+sim/emu/run.sh nd80aj6.dmk           # boot a disk (positional args -> --disk0..3)
+sim/emu/run.sh game.dmk --skin=green # every --option passes through
+```
+
+The launcher builds the emulator if needed, finds the ROM (`TRS80_ROM`, else
+a short candidate list), defaults to the grey photo skin, `--throttle=0.7`
+(pinned pitch near the current real-time ceiling) and plays trs80gp's drive
+recordings when the app is installed. Environment overrides: `TRS80_ROM`,
+`TRS80_SKIN`, `TRS80_KBD` (QWERTZ users: `de`), `TRS80_THROTTLE`.
+`Vm1_core --help` prints the full option summary.
+
 ## Debugging with DeZog (`--debug-pty`)
 
 The emulator build includes the full debug core (`m1_debug`, ADR-0006).

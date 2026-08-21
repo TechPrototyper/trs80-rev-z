@@ -80,7 +80,58 @@
 static void usage(const char* argv0)
 {
     fprintf(stderr,
-        "Usage: %s --rom=<hex> [--disk0=<dmk>] ... [--scale=2] [--throttle]\n",
+"TRS-80 Model I — Rev Z emulator (cycle-true Verilator model)\n"
+"\n"
+"Usage: %s --rom=<hex> [options]\n"
+"       sim/emu/run.sh [disk.dmk ...] [options]   (launcher with defaults)\n"
+"\n"
+"Machine\n"
+"  --rom=<hex>          Level II ROM as $readmemh hex (12-16 KB; REQUIRED —\n"
+"                       the repo ships no ROMs)\n"
+"  --no-ei | --ei16 | --ei32\n"
+"                       16K keyboard-only / 32K / 48K machine (default --ei32)\n"
+"  --no-percom          Disable the Percom-style doubler board\n"
+"\n"
+"Media\n"
+"  --disk0..3=<dmk>     Mount DMK disk images (single- or double-sided)\n"
+"  --wp0..3             Write-protect the corresponding drive\n"
+"  --cas=<file>         Insert cassette: .cas (synthesized pulses) or .wav\n"
+"  --cas-baud=<n>       Baud rate for .cas synthesis (default 500)\n"
+"  --cas-save=<file>    Record machine writes as .cas or .wav (-1, -2 suffixes)\n"
+"\n"
+"Sound\n"
+"  --no-sound           Silence the program channel (cassette ladder)\n"
+"  --volume=<0..100>    Program-sound volume (default 60; drives keep their\n"
+"                       fixed period-correct loudness)\n"
+"  --drive-sounds=<dir> Real drive recordings; understands our asset names AND\n"
+"                       trs80gp's Resources dir (loaded in place). Without a\n"
+"                       dir the voices are synthesized; --no-drive-sounds off\n"
+"  --click-pitch=<f>    Step-voice playback rate 0.2-2.0 (default 1.0)\n"
+"  --sound-dump=<wav>   Mirror the speaker feed into a 44.1 kHz WAV\n"
+"\n"
+"Display\n"
+"  --scale=<n>          Plain-window pixel scale (default 2)\n"
+"  --skin=grey|green    Photographic monitor front (first series / later\n"
+"                       smoked-plate revision); CRT-curved picture\n"
+"  --shot=<bmp>         Save one frame (at --shot-at, default 600) and keep going\n"
+"  --hidden             No window; also mutes unless --volume is explicit\n"
+"                       (for scripted runs)\n"
+"\n"
+"Input\n"
+"  --kbd=us|de          Host keyboard layout (default us); F12 = RESET button\n"
+"  --type=<text>        Auto-type at --type-at frames; \\n = ENTER,\n"
+"                       \\w = wait ~5 machine seconds\n"
+"  --enter-until=<f>    Hold ENTER from power-on until frame f\n"
+"\n"
+"Pacing & debug\n"
+"  --throttle[=<f>]     Pin emulation to f x real time (e.g. 0.7); no value = 1.0\n"
+"  --debug-tcp=<port>   m1_debug binary link on localhost TCP (robust for scripts)\n"
+"  --debug-pty          Same link on a pty (macOS: may be deaf when CoreAudio\n"
+"                       starts — prefer --debug-tcp)\n"
+"  --pctrace=lo:hi:file Log instruction-fetch PCs in [lo,hi] (hex), one @xxxx\n"
+"                       per line (diffable vs trs80gp -tr)\n"
+"\n"
+"  --help | -h          This text. Full descriptions: sim/emu/README.md\n",
         argv0);
 }
 
@@ -449,6 +500,7 @@ int main(int argc, char** argv)
         else if (a == "--no-drive-sounds") { drive_sounds = false; }
         else if ((v = arg_value(a, "--drive-sounds=")) != "") { drive_dir = v; }
         else if ((v = arg_value(a, "--click-pitch=")) != "") { click_pitch = atof(v.c_str()); }
+        else if (a == "--help" || a == "-h") { usage(argv[0]); return 0; }
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
