@@ -82,6 +82,8 @@ drives 0–3 only; drive numbers above 3 do not exist.
 | `--no-drive-sounds` | off | Disable the drive sounds (four synthesized voices on the m1_drives event stream: per-drive detuned motor with spin-up and the one-shot's 3 s run-out, step clicks; all disks spin on the shared motor line). Fixed loudness relative to the program channel by design |
 | `--sound-dump=<file>` | (none) | Mirror the program-sound output into a 44.1 kHz WAV (listen/measure without a remote-desktop audio path in the way) |
 | `--cas-save=<file>` | (none) | Record what the machine writes: each motor-on stretch is decoded (500 baud) and saved as `.cas` bytes or a synthesized `.wav`; later saves get `-1`, `-2`, … suffixes |
+| `--skin=<s>` | `none` | Monitor front: `grey` (first-series case, white P4 phosphor, red power key) or `green` (later revision: dark bezel, three knobs, P1 green). Procedurally drawn; the picture bends over a CRT-curved vertex grid with a corner vignette — not perfectly straight, but straight enough |
+| `--shot=<file>` | (none) | Save one rendered frame as BMP (at `--shot-at`, default frame 600) — works with `--hidden`, used for the skin verification shots |
 | `--kbd=<layout>` | `us` | Host keyboard layout (`us` or `de`) — scancodes are physical, so this decides which legend a key produces (QWERTZ swaps Y/Z, `:` sits on shift+`.`, …) |
 | `--debug-pty` | off | Expose the `m1_debug` binary-v0 link on a pseudo-tty. Known macOS quirk: on some launches with program sound active, the freshly started CoreAudio thread leaves the process's pty deaf from birth (bytes written to the slave never reach the master; per-launch, not per-access). Use `--debug-tcp` when scripting |
 | `--debug-tcp=<port>` | off | Same binary-v0 link on a localhost TCP listener — the robust choice for scripted/CI use; `tools/trszog_bridge.py --serial tcp:<port>` and `tools/emu_screen_dump.py tcp:<port>` speak it directly |
@@ -142,7 +144,7 @@ behind, regardless of release order.
 
 ## Backlog / ideas
 
-- **CRT bezel skin.** Project the 384×192 frame into a photographed
-  TRS-80 Model 1 monitor, with barrel distortion like a real tube. Two
-  skins: the original grey monitor (white phosphor, red power key) and
-  the later revision (green phosphor, bezel, three front knobs).
+- **CRT bezel skin — shipped as `--skin=grey|green`** (procedural
+  drawing + barrel-warped vertex grid). Possible refinements: photo
+  textures instead of the procedural front, scanline/bloom shading,
+  a soft power-on fade.

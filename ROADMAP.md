@@ -190,6 +190,35 @@ VRAM comparison against trs80gp, then on the ULX3S over HDMI with a USB keyboard
       verification extended to actual silicon. The Z80 itself stays 48 K — the surplus
       power works *for* the small machine, never inside it.
 
+### M7 — Sound & Gestalt (the machine you hear and see)
+
+Pulled ahead of M5/M6 by explicit maintainer priority (2026-08-21):
+nothing external depends on the serial/printer ports, while sound and
+looks pay joy immediately. Rev-Z rule throughout: every part switches
+off to the bit-exact stock machine.
+
+- [X] Program sound: the cassette output ladder — the Model 1's only
+      voice — through SDL audio (`--volume`, `--no-sound`); pitch from
+      a measured emulated-vs-wall pace, honest to the simulation's
+      speed (`--throttle=<f>` pins it). On the board the ladder drives
+      both 4-bit DACs of the audio jack. *Verified: BASIC OUT-255
+      buzzer, --sound-dump spectrum; heard live.*
+- [X] Drive sounds from the m1_drives event stream (`m1_core.snd`):
+      per-drive detuned motors with spin-up and the REAL 3 s one-shot
+      run-out, step voice per head pulse; all disks spin on the shared
+      motor line. Synthesized by default (struck-metal modes + case
+      comb), real recordings via `--drive-sounds=<dir>`
+      (maintainer's trs80-drivesounds corpus plugs in directly);
+      `--click-pitch` tunes the arm. *Verified: TRSDOS boot/DIR energy
+      profile; final voicing session pending (task list).*
+- [X] Monitor skins: `--skin=grey` (first series, P4 white, red power
+      key) and `--skin=green` (dark bezel, three knobs, P1 green),
+      procedurally drawn, picture bent over a CRT vertex grid.
+      *Verified by rendered shots (`--shot`).*
+- [ ] Board side of the drive sounds (audio_r channel) and the
+      emulator's insert/eject/door sounds — the latter need runtime
+      media swaps, i.e. the companion UI.
+
 ### M5 — RS-232-C
 
 - [ ] UART register model at 0xE8–0xEB (ADR-0005 §6), line side routed to

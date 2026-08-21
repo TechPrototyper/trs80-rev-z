@@ -207,7 +207,7 @@ float EmuAudio::drive_mix()
         // pitch color from the detune, amplitude jitter per hit
         if (!smp_step_.d.empty() && sp_pos_[d] >= 0.0f) {
             out += samp_at(smp_step_.d, sp_pos_[d]) * sp_amp_[d] * 1.4f;
-            sp_pos_[d] += smp_step_.inc * detune[d];
+            sp_pos_[d] += smp_step_.inc * detune[d] * click_pitch_;
             if (sp_pos_[d] >= (float)smp_step_.d.size() - 2.0f)
                 sp_pos_[d] = -1.0f;
         }
@@ -222,6 +222,16 @@ float EmuAudio::drive_mix()
     static const float amp[3] = {0.55f, 0.30f, 0.12f};
     float knock = 0.0f;
     bool  ring  = false;
+    // low body thump under every hit — the mass of the arm through
+    // the chassis, the "bass" a close-mic click alone lacks
+    if (body_env_ > 0.0008f) {
+        ring = true;
+        body_ph_ += 2.0f * (float)M_PI * 170.0f * click_pitch_ / 44100.0f;
+        if (body_ph_ > 2.0f * (float)M_PI)
+            body_ph_ -= 2.0f * (float)M_PI;
+        knock += 0.8f * body_env_ * sinf(body_ph_);
+        body_env_ *= 0.9989f;               // ~20 ms
+    }
     for (int m = 0; m < 3; m++) {
         if (ck_env_[m] > 0.0005f) {
             ring = true;
@@ -283,6 +293,8 @@ void EmuAudio::tick(uint8_t ladder, uint8_t snd, uint8_t disks)
             float v = 0.85f + 0.15f * ((float)(rng_ & 0xFFFF) / 65536.0f);
             static const float detune[4] = {1.000f, 0.972f, 1.031f,
                                             0.988f};
+            body_env_ = v;                 // chassis thump on every hit
+            body_ph_  = 0.0f;
             if (!smp_step_.d.empty()) {
                 sp_pos_[d] = 0.0f;         // real recording: retrigger
                 sp_amp_[d] = v;

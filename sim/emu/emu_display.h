@@ -9,12 +9,18 @@
 //   x = (col - 2) * 6 + dot_in_cell   (col lags two cells behind the shift path)
 //   y = row * 12 + line
 //
-// present() copies the framebuffer to an SDL2 texture scaled to the window
-// (×2 or ×3) and renders it.  It returns false when the SDL quit event is
-// pending (user closed the window).
+// present() renders the framebuffer. Plain mode scales it into the
+// window as before. Skin mode (M7 stage 3) sets the picture into a
+// procedurally drawn Model 1 monitor front — the grey first-series
+// case (white P4 phosphor, red power key) or the later green-phosphor
+// revision (dark bezel, three front knobs) — and bends it over a CRT:
+// a vertex grid with mild barrel distortion and a corner vignette,
+// "not perfectly straight, but straight enough".
 
 #pragma once
 #include <cstdint>
+#include <string>
+#include <vector>
 #include <SDL.h>
 
 // Forward declaration: emu_display optionally forwards key events to the
@@ -23,8 +29,12 @@ class EmuKeyboard;
 
 class EmuDisplay {
 public:
-    // scale: integer pixel multiplier (2 or 3 recommended).
-    explicit EmuDisplay(int scale = 2, bool hidden = false);
+    enum class Skin { NONE, GREY, GREEN };
+
+    // scale: integer pixel multiplier (2 or 3 recommended; skin mode
+    // sizes its own window and ignores it).
+    explicit EmuDisplay(int scale = 2, bool hidden = false,
+                        Skin skin = Skin::NONE);
     ~EmuDisplay();
 
     // Called per dot clock with m1_core's video outputs (after eval()).
@@ -35,6 +45,9 @@ public:
 
     // Render the current framebuffer.  Returns false if quit requested.
     bool present();
+
+    // Save the next rendered frame as a BMP (before it is presented).
+    void request_shot(const std::string& path) { shot_path_ = path; }
 
     // Drain pending SDL events, then rebuild the keyboard matrix from the
     // refreshed SDL keyboard state.
@@ -54,6 +67,7 @@ private:
     SDL_Window*   win_  = nullptr;
     SDL_Renderer* ren_  = nullptr;
     SDL_Texture*  tex_  = nullptr;
+    SDL_Texture*  bezel_ = nullptr;
 
     // 1-bpp packed as bytes (1 = white, 0 = black)
     uint8_t fb_[W * H] = {};
@@ -62,5 +76,16 @@ private:
     uint8_t prev_col_ = 0x7F;
     uint8_t dot_      = 0;
 
-    int scale_;
+    int  scale_;
+    Skin skin_ = Skin::NONE;
+    int  winw_ = 0, winh_ = 0;
+    uint32_t phosphor_ = 0xFFFFFFFF;
+
+    std::vector<SDL_Vertex> verts_;
+    std::vector<int>        idx_;
+
+    std::string shot_path_;
+
+    void build_bezel();
+    void build_grid(float cx, float cy, float rx, float ry);
 };

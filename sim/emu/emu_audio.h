@@ -51,6 +51,16 @@ public:
     // engine is fully procedural (the repo ships no audio assets).
     void load_drive_samples(const std::string& dir);
 
+    // Playback-rate factor for the step voice (default 0.65: the arm
+    // knock sits lower and thicker than the raw sample) — a knob for
+    // the maintainer's ear instead of another guessing round.
+    void set_click_pitch(float f)
+    {
+        if (f < 0.2f) f = 0.2f;
+        if (f > 2.0f) f = 2.0f;
+        click_pitch_ = f;
+    }
+
 private:
     uint32_t dev_ = 0;
     float    vol_ = 0.6f;
@@ -84,6 +94,7 @@ private:
     // sample players (loaded voices; -1 position = idle)
     struct Samp { std::vector<float> d; float inc = 1.0f; };
     Samp     smp_step_, smp_motor_;
+    float    click_pitch_ = 0.65f;
     float    sp_pos_[4] = {-1, -1, -1, -1};
     float    sp_amp_[4] = {0, 0, 0, 0};
     float    mp_pos_[4] = {0, 0, 0, 0};
@@ -93,6 +104,8 @@ private:
     // step "clack": three struck-metal modes + a short sheet-metal
     // case comb (the drive lived in a metal box — the arm's knock has
     // a boxy ring, not a hiss)
+    float    body_env_ = 0.0f;             // low 170 Hz thump under a hit
+    float    body_ph_  = 0.0f;
     float    ck_env_[3] = {0, 0, 0};
     float    ck_ph_[3]  = {0, 0, 0};
     float    ck_det_    = 1.0f;            // per-hit color (drive detune)

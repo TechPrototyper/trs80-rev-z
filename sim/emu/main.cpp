@@ -402,9 +402,13 @@ int main(int argc, char** argv)
     bool        sound    = true;
     int         volume   = 60;
     bool        hidden   = false;
+    std::string skin_name = "none";
+    std::string shot_path;
+    int         shot_at  = 600;
     std::string sound_dump;
     bool        drive_sounds = true;
     std::string drive_dir;
+    double      click_pitch = 0.65;
 
     for (int i = 1; i < argc; i++) {
         std::string a(argv[i]);
@@ -436,10 +440,14 @@ int main(int argc, char** argv)
         else if ((v = arg_value(a, "--cas-save=")) != "") { cas_save = v; }
         else if (a == "--no-sound") { sound = false; }
         else if (a == "--hidden")   { hidden = true; }
+        else if ((v = arg_value(a, "--skin=")) != "") { skin_name = v; }
+        else if ((v = arg_value(a, "--shot=")) != "") { shot_path = v; }
+        else if ((v = arg_value(a, "--shot-at=")) != "") { shot_at = atoi(v.c_str()); }
         else if ((v = arg_value(a, "--volume=")) != "") { volume = atoi(v.c_str()); }
         else if ((v = arg_value(a, "--sound-dump=")) != "") { sound_dump = v; }
         else if (a == "--no-drive-sounds") { drive_sounds = false; }
         else if ((v = arg_value(a, "--drive-sounds=")) != "") { drive_dir = v; }
+        else if ((v = arg_value(a, "--click-pitch=")) != "") { click_pitch = atof(v.c_str()); }
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
@@ -476,6 +484,7 @@ int main(int argc, char** argv)
     audio.set_drive_sounds(drive_sounds);
     if (sound && drive_sounds && !drive_dir.empty())
         audio.load_drive_samples(drive_dir);
+    audio.set_click_pitch((float)click_pitch);
     EmuKeyboard kbd;
     if (kbd_layout == "de") {
         kbd.set_layout(EmuKeyboard::Layout::DE);
@@ -484,7 +493,17 @@ int main(int argc, char** argv)
                 kbd_layout.c_str());
         return 1;
     }
-    EmuDisplay  disp(scale, hidden);
+    EmuDisplay::Skin skin = EmuDisplay::Skin::NONE;
+    if (skin_name == "grey" || skin_name == "gray")
+        skin = EmuDisplay::Skin::GREY;
+    else if (skin_name == "green")
+        skin = EmuDisplay::Skin::GREEN;
+    else if (skin_name != "none") {
+        fprintf(stderr, "--skin: unknown skin '%s' (none, grey, green)\n",
+                skin_name.c_str());
+        return 1;
+    }
+    EmuDisplay  disp(scale, hidden, skin);
     DebugPty    dbg;
     if (debug_pty && !dbg.open()) return 1;
     if (debug_tcp && !dbg.open_tcp(debug_tcp)) return 1;
@@ -669,6 +688,10 @@ int main(int argc, char** argv)
             autotype.frame();
             if ((++framecnt % 60) == 0)
                 disp.set_frame(framecnt);
+            if (!shot_path.empty() && framecnt == (uint64_t)shot_at) {
+                disp.request_shot(shot_path);
+                shot_path.clear();
+            }
             // pace report: emulated frames vs wall clock, every ~5 s
             {
                 static auto   t0 = std::chrono::steady_clock::now();
