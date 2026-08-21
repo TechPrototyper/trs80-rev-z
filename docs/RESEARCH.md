@@ -78,4 +78,29 @@ Kept deliberately public — this is the quality bar working as intended:
   FA/F8 DAMs and verify the record type on every directory read, while
   boot sectors are plain FB. Fixed in `m1_fdc.v`; the golden boot chain
   had never exercised a directory read, which is why it stayed green.
+- A **forced interrupt (0xDx) issued while idle did not revert the status
+  mux to Type I** — it stayed on the last command class. NEWDOS/80's
+  resident driver writes 0xD0 after every sector read and then polls
+  status bit 1 for **index pulses** as a drive-alive check; with the mux
+  stuck on Type II that bit is DRQ (constant 0), the poll times out, and
+  a byte-perfect, error-free `BASIC` lookup ends in PROGRAM NOT FOUND.
+  Diagnosed by diffing instruction traces (new emulator `--pctrace`
+  against `trs80gp -tr`): identical control flow up to a single
+  `jp nz,$4409` whose flag came from that timeout. Fixed in `m1_fdc.v`
+  per the 177x datasheet (FI while a command runs: busy clears, other
+  bits keep; FI while idle: Type I status), 2026-08-21.
+- **No gap-II latency before the data phase**: the IDAM scan is
+  instantaneous in the model, so the first data byte arrived ~64 µs
+  after the read command. On real hardware ID + gap II rotate under the
+  head first (≥ ~1 ms in FM), which is why NEWDOS/80's interruptible
+  setup window (command → `DI`, ~130 µs) can never meet data. On rev-z
+  the 40 Hz heartbeat ISR (long on the nd80aj6 "V6" clock mod) landed in
+  that window, DRQs went unserviced, and the boot-time read of the saved
+  date failed with lost data — the DOS then fell into its error path,
+  which is what forced the DATE?/TIME? prompts and, via the ROM's CR
+  hook `CALL 41D0` (NEWDOS keeps *data* there), the wild jump that
+  looked like a reboot. Fixed with a `GAP2_US` (1.1 ms) floor between
+  DAM match and first byte in `m1_fdc.v`, 2026-08-21. All 10 golden
+  targets stay byte-exact; aj6 now boots to READY like trs80gp and
+  loads BASIC.
 

@@ -35,7 +35,10 @@
 //   - reset: command/track/sector/data all 0x00 (sector is NOT 1)
 //   - Type I status: {~ready, wprt, hld(0), seek_err, crc(0), tr00,
 //     index, busy}; Type II/III status: {~ready, wprt|rt1, rt0, rnf,
-//     crc(0), lost, drq, busy} — the mux follows the last command class.
+//     crc(0), lost, drq, busy} — the mux follows the last command class;
+//     a forced interrupt (0xDx) issued while idle reverts it to Type I
+//     (NEWDOS/80's driver D0s after each read, then polls S1 for index
+//     pulses as a drive-alive check — z88a lookup divergence, 2026-08-21).
 //     rt1:rt0 is the read record type: 1771/FM = ~DAM[1:0] (FB=00 FA=01
 //     F9=10 F8=11 — TRS-80 DOS directories use FA/F8 and check this),
 //     1791/MFM = deleted flag in rt0 only (fdcdamtest probe, 2026-08-20)
@@ -55,6 +58,15 @@ module m1_fdc #(
     parameter [14:0] RATE2_US = 15'd10000,
     parameter [14:0] RATE3_US = 15'd20000,
     parameter [6:0]  BYTE_US  = 7'd64,       // FM data rate: 1 byte/64 us
+    // Gap II rotates under the head between the ID field and the DAM
+    // (FM: ~17 bytes of FF/00 = ~1.1 ms). The IDAM scan above is
+    // instantaneous, so without this floor the first data byte would
+    // arrive ~64 us after the command — real drivers (NEWDOS/80) have an
+    // interruptible setup window wider than that between issuing the
+    // read and their DI, and a long 40 Hz ISR landing in it would eat
+    // DRQs that a real 177x could never have raised yet (aj6 boot,
+    // 2026-08-21).
+    parameter [14:0] GAP2_US  = 15'd1100,
     // MFM: true 32 us/byte. tv80 is datasheet-exact in T-states
     // (tb_z80_tstates), so 56.7 T per MFM byte is servicable exactly as
     // on real hardware: it takes the doubler-era unrolled driver loops,
@@ -208,7 +220,8 @@ module m1_fdc #(
         T_WTTICK = 5'd17,           // write track: byte cadence
         T_WTBYTE = 5'd18,           // write track: classify + store
         T_WTB2   = 5'd19,           // second copy / second CRC byte
-        T_WTFIN  = 5'd20;           // rebuild the IDAM pointer table
+        T_WTFIN  = 5'd20,           // rebuild the IDAM pointer table
+        R_GAP    = 5'd21;           // gap II passes the head before the data
 
     reg [4:0]  rstate;
     reg        is_ra;               // Read Address (else Read Sector)
@@ -379,6 +392,12 @@ module m1_fdc #(
                             if (rstate != R_FLUSH)       // a flush is media
                                 rstate <= R_IDLE;        // work, not a cmd
                             drq    <= 1'b0;
+                            // 177x: forced interrupt with no command
+                            // running reverts the status mux to Type I
+                            // (NEWDOS/80 D0s after every read, then polls
+                            // S1 for index pulses); mid-command the other
+                            // status bits are left as-is
+                            if (!busy) t2ctx <= 1'b0;
                             if (wd_d[3]) intrq <= 1'b1;  // immediate-INT flag
                         end else if (!busy) begin
                             if (!wd_d[7]) begin          // Type I
@@ -658,8 +677,8 @@ module m1_fdc #(
                             // 128<<ln data bytes, then a fresh CRC
                             rd_n_left <= 13'd128 << id_ln;
                             wphase    <= 2'd0;
-                            us_byte   <= byte_us_w;
-                            rstate    <= W_TICK;
+                            us_cnt    <= GAP2_US;
+                            rstate    <= R_GAP;
                         end else begin
                             // 1771 (FM): S6:S5 = ~DAM[1:0] — four record
                             // types; 1791 (MFM): S5 = deleted DAM, S6 = 0
@@ -667,8 +686,8 @@ module m1_fdc #(
                                               : ~tb_q[1:0];
                             rd_pos    <= rd_pos + step_w;
                             rd_n_left <= 13'd128 << id_ln;
-                            us_byte   <= byte_us_w;
-                            rstate    <= R_TICK;
+                            us_cnt    <= GAP2_US;
+                            rstate    <= R_GAP;
                         end
                     end else if (dam_hunt == 6'd0) begin
                         entry   <= entry_n;              // no DAM: next IDAM
@@ -682,6 +701,15 @@ module m1_fdc #(
                         rd_pend  <= 1'b1;
                     end
                 end
+
+                R_GAP:
+                    if (en_1m) begin
+                        if (us_cnt <= 15'd1) begin
+                            us_byte <= byte_us_w;
+                            rstate  <= is_wr ? W_TICK : R_TICK;
+                        end else
+                            us_cnt <= us_cnt - 15'd1;
+                    end
 
                 R_TICK:
                     if (en_1m) begin
