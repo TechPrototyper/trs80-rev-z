@@ -538,6 +538,22 @@ int main(int argc, char** argv)
             autotype.frame();
             if ((++framecnt % 60) == 0)
                 disp.set_frame(framecnt);
+            // pace report: emulated frames vs wall clock, every ~5 s
+            {
+                static auto   t0 = std::chrono::steady_clock::now();
+                static auto   tl = t0;
+                static uint64_t fl = 0;
+                auto nowt = std::chrono::steady_clock::now();
+                double dt = std::chrono::duration<double>(nowt - tl).count();
+                if (dt >= 5.0) {
+                    double fps = (double)(framecnt - fl) / dt;
+                    fprintf(stderr, "emu: %.1f fps (%.2fx realtime)\n",
+                            fps, fps / 60.0);
+                    fflush(stderr);
+                    tl = nowt;
+                    fl = framecnt;
+                }
+            }
             if (dbg.enabled())
                 dbg.service();
         }

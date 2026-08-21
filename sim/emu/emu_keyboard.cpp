@@ -13,6 +13,9 @@
 
 #include "emu_keyboard.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 // (shift, HID scancode) -> {row, col, force_on, force_off}; transcription
 // of m1_hid_keys.v map_key. SDL scancodes are HID usage codes.
 bool EmuKeyboard::map_key(bool shifted, int scancode,
@@ -215,6 +218,18 @@ void EmuKeyboard::rebuild()
     } else if (!any_off && phys_shift) {
         if (lshift) mask |= uint64_t(1) << (8 * 7 + 0);
         if (rshift) mask |= uint64_t(1) << (8 * 7 + 1);
+    }
+
+    // EMU_KBD_LOG=1: trace every matrix change with the scancodes behind
+    // it — the tool for "this key types the wrong glyph" reports.
+    if (getenv("EMU_KBD_LOG") && mask != keys_) {
+        fprintf(stderr, "kbd: layout=%s shift=%d%d mask=%016llx sc=[",
+                layout_ == Layout::DE ? "de" : "us", lshift, rshift,
+                (unsigned long long)mask);
+        for (int sc = 0; sc < numkeys; sc++)
+            if (st[sc]) fprintf(stderr, " %02x", sc);
+        fprintf(stderr, " ]\n");
+        fflush(stderr);
     }
 
     keys_ = mask;
