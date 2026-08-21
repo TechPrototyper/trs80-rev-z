@@ -712,6 +712,7 @@ int main(int argc, char** argv)
     // ---- Main simulation loop ----
     bool running = true;
     uint64_t framecnt = 0;
+    unsigned dbg_svc_cnt = 0;
     while (running && !ctx.gotFinish()) {
 
         // --- Debug link: sample the handshake pre-edge (clk still 0 and
@@ -830,10 +831,19 @@ int main(int argc, char** argv)
                     fl = framecnt;
                 }
             }
-            if (dbg.enabled())
-                dbg.service();
         }
         prev_vdrv = top.vdrv;
+
+        // --- Service the debug link every ~4096 clocks (~0.4 ms machine
+        // time), not once per frame: a debugger transaction is a strict
+        // command/response ping-pong, so frame-rate servicing quantized
+        // every exchange to ~24 ms — the screen view's halt/peek/run
+        // VRAM poll then froze the CPU for ~137 ms per poll (measured)
+        // and games ran at a crawl under the view. At this rate the same
+        // poll costs ~2 ms; the nonblocking-syscall overhead (~2600/s)
+        // is noise next to the Verilator eval. ---
+        if (dbg.enabled() && (++dbg_svc_cnt & 0xFFF) == 0)
+            dbg.service();
 
         if (throttle)
             thr.wait_for_tick();
