@@ -38,7 +38,7 @@ module tb_m1_ei;
         .drive_sel(drive_sel), .motor_on(motor_on), .en_1m(en_1m),
         /* verilator lint_off PINCONNECTEMPTY */
         .fdc_step(), .fdc_dirc(),
-        .trk_req(), .trk_drv(), .trk_track(),
+        .trk_req(), .trk_drv(), .trk_track(), .trk_side(),
         /* verilator lint_on PINCONNECTEMPTY */
         .trk_vld(1'b0), .trk_data(8'd0), .trk_idx(13'd0),
         .trk_done(1'b0), .trk_err(1'b1), .trk_len(13'd0), .trk_dbl(1'b0),

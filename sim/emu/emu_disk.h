@@ -53,6 +53,7 @@ public:
     uint8_t  trk_req        = 0;
     uint8_t  trk_drv        = 0;   // 2 bits
     uint8_t  trk_track      = 0;   // 7 bits
+    uint8_t  trk_side       = 0;   // DS latch bit 3: head 1
 
     uint8_t  trk_wb_req     = 0;
     // trk_wb_data: byte the FDC provides after we assert trk_wb_fetch
@@ -68,7 +69,7 @@ private:
         bool                 wp       = false;
         int                  ntracks  = 0;
         int                  tracklen = 0;
-        int                  sides    = 1;   // 2: DS image, side 0 served
+        int                  sides    = 1;   // 2: DS image (2 blocks/cyl)
         bool                 dbl      = false;
         std::vector<uint8_t> image;  // raw DMK bytes
     };
@@ -82,6 +83,7 @@ private:
     State state_     = State::IDLE;
     int   cur_drv_   = 0;
     int   cur_track_ = 0;
+    int   cur_side_  = 0;
     int   byte_idx_  = 0;
 
     std::vector<uint8_t> wb_buf_;

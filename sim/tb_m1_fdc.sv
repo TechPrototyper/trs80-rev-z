@@ -43,6 +43,7 @@ module tb_m1_fdc;
     // shortened rates: 40/40/80/160 "us" of the fast enable
     wire [1:0] sel_idx;
     wire [6:0] pos_sel;
+    wire       side_sel;
 
     m1_fdc #(.RATE0_US(15'd40), .RATE1_US(15'd40),
              .RATE2_US(15'd80), .RATE3_US(15'd160)) u_fdc (
@@ -51,10 +52,10 @@ module tb_m1_fdc;
         .dout(dout), .dout_en(dout_en), .intrq(intrq),
         .step(step), .dirc(dirc),
         .tr00(tr00), .ip(ip), .wprt(wprt), .ready(ready),
-        .sel_drv(sel_idx), .pos_sel(pos_sel),
+        .sel_drv(sel_idx), .pos_sel(pos_sel), .sel_side(side_sel),
         // Type I only here — the read path runs in tb_m1_fdc_rd
         /* verilator lint_off PINCONNECTEMPTY */
-        .trk_req(), .trk_drv(), .trk_track(),
+        .trk_req(), .trk_drv(), .trk_track(), .trk_side(),
         /* verilator lint_on PINCONNECTEMPTY */
         .trk_vld(1'b0), .trk_data(8'd0), .trk_idx(13'd0),
         .trk_done(1'b0), .trk_err(1'b1), .trk_len(13'd0), .trk_dbl(1'b0),
@@ -70,7 +71,7 @@ module tb_m1_fdc;
         .ds(ds), .motor_on(motor_on), .disk(disk), .disk_wp(4'b0000),
         .step(step), .dirc(dirc),
         .tr00(tr00), .ip(ip), .wprt(wprt), .ready(ready),
-        .sel_idx(sel_idx), .pos_sel(pos_sel)
+        .sel_idx(sel_idx), .pos_sel(pos_sel), .side(side_sel)
     );
 
     int steps_seen;

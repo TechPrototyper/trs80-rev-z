@@ -477,6 +477,7 @@ int main(int argc, char** argv)
         disk.trk_req        = top.trk_req;
         disk.trk_drv        = top.trk_drv;
         disk.trk_track      = top.trk_track;
+        disk.trk_side       = top.trk_side;
         disk.trk_wb_req     = top.trk_wb_req;
         disk.trk_wb_data_in = top.trk_wb_data;   // FDC exposes byte here
 

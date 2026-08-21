@@ -101,11 +101,13 @@ module m1_fdc #(
     input  wire        ready,
     input  wire [1:0]  sel_drv,      // selected drive index (drive bay)
     input  wire [6:0]  pos_sel,      // its head position
+    input  wire        sel_side,     // side 1 selected (DS latch bit 3)
 
     // track fetch port (media provider: DMK fetcher / bench model)
     output reg         trk_req,      // pulse: fetch (trk_drv, trk_track)
     output reg  [1:0]  trk_drv,
     output reg  [6:0]  trk_track,
+    output reg         trk_side,
     input  wire        trk_vld,      // one byte of the raw track
     input  wire [7:0]  trk_data,
     input  wire [12:0] trk_idx,
@@ -176,9 +178,10 @@ module m1_fdc #(
     assign trk_wb_data = tb_q;      // write-back pull: addr set on fetch,
                                     // valid two clocks later (registered)
 
-    reg        tbv;                  // buffer holds (tb_drv, tb_trk)
+    reg        tbv;                  // buffer holds (tb_drv, tb_trk, tb_side)
     reg [1:0]  tb_drv;
     reg [6:0]  tb_trk;
+    reg        tb_side;
     reg [12:0] tb_len;
     reg        tb_dbl;
 
@@ -338,11 +341,13 @@ module m1_fdc #(
             tbv      <= 1'b0;
             tb_drv   <= 2'd0;
             tb_trk   <= 7'd0;
+            tb_side  <= 1'b0;
             tb_len   <= 13'd0;
             tb_dbl   <= 1'b0;
             trk_req  <= 1'b0;
             trk_drv  <= 2'd0;
             trk_track <= 7'd0;
+            trk_side <= 1'b0;
         end else begin
             step    <= 1'b0;
             trk_req <= 1'b0;
@@ -356,6 +361,7 @@ module m1_fdc #(
             if (rstate == R_IDLE && tb_dirty && ready_d && !ready) begin
                 trk_drv    <= tb_drv;
                 trk_track  <= tb_trk;
+                trk_side   <= tb_side;
                 trk_wb_req <= 1'b1;
                 flush_idle <= 1'b1;
                 rstate     <= R_FLUSH;
@@ -543,7 +549,8 @@ module m1_fdc #(
                 R_IDLE: ;
 
                 R_SETUP: begin
-                    if (tbv && tb_drv == sel_drv && tb_trk == pos_sel) begin
+                    if (tbv && tb_drv == sel_drv && tb_trk == pos_sel
+                        && tb_side == sel_side) begin
                         if (is_wt)
                             rstate <= T_WTWAIT;
                         else if (is_rt) begin
@@ -566,6 +573,7 @@ module m1_fdc #(
                     end else if (tbv && tb_dirty) begin
                         trk_drv    <= tb_drv;       // flush the old track
                         trk_track  <= tb_trk;
+                        trk_side   <= tb_side;
                         trk_wb_req <= 1'b1;
                         flush_idle <= 1'b0;
                         rstate     <= R_FLUSH;
@@ -573,6 +581,7 @@ module m1_fdc #(
                         tbv       <= 1'b0;
                         trk_drv   <= sel_drv;
                         trk_track <= pos_sel;
+                        trk_side  <= sel_side;
                         trk_req   <= 1'b1;
                         rstate    <= R_FETCH;
                     end
@@ -583,12 +592,13 @@ module m1_fdc #(
                     if (trk_err)
                         rstate <= R_NFWAIT;              // media gone: RNF
                     else if (trk_done) begin
-                        tbv    <= 1'b1;
-                        tb_drv <= sel_drv;
-                        tb_trk <= pos_sel;
-                        tb_len <= trk_len;
-                        tb_dbl <= trk_dbl;
-                        rstate <= R_SETUP;
+                        tbv     <= 1'b1;
+                        tb_drv  <= sel_drv;
+                        tb_trk  <= pos_sel;
+                        tb_side <= sel_side;
+                        tb_len  <= trk_len;
+                        tb_dbl  <= trk_dbl;
+                        rstate  <= R_SETUP;
                     end
                 end
 

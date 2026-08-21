@@ -31,7 +31,7 @@ YOSYS     ?= yosys
 all: run
 
 # build + run every testbench
-run: $(BINS) build/tb_m1_ram48/Vtb_m1_ram48 build/tb_m1_ei_hb/Vtb_m1_ei_hb build/tb_m1_fdc_sys/Vtb_m1_fdc_sys build/tb_m1_fdc_rd/Vtb_m1_fdc_rd build/tb_m1_fdc_dam/Vtb_m1_fdc_dam build/tb_m1_fdc_wr/Vtb_m1_fdc_wr build/tb_m1_fdc_trk/Vtb_m1_fdc_trk build/tb_m1_fdc_dd/Vtb_m1_fdc_dd build/tb_m1_debug/Vtb_m1_debug build/fdc_disk.hex build/fdc_disk_wp.hex build/fdc_disk_dd.hex build/fdc_dam_disk.hex
+run: $(BINS) build/tb_m1_ram48/Vtb_m1_ram48 build/tb_m1_ei_hb/Vtb_m1_ei_hb build/tb_m1_fdc_sys/Vtb_m1_fdc_sys build/tb_m1_fdc_rd/Vtb_m1_fdc_rd build/tb_m1_fdc_dam/Vtb_m1_fdc_dam build/tb_m1_fdc_ds/Vtb_m1_fdc_ds build/tb_m1_fdc_wr/Vtb_m1_fdc_wr build/tb_m1_fdc_trk/Vtb_m1_fdc_trk build/tb_m1_fdc_dd/Vtb_m1_fdc_dd build/tb_m1_debug/Vtb_m1_debug build/fdc_disk.hex build/fdc_disk_wp.hex build/fdc_disk_dd.hex build/fdc_dam_disk.hex build/fdc_ds_disk.hex
 	@set -e; for tb in $(TBS); do \
 	  echo "=== $$tb ==="; build/$$tb/V$$tb; \
 	done
@@ -53,6 +53,8 @@ run: $(BINS) build/tb_m1_ram48/Vtb_m1_ram48 build/tb_m1_ei_hb/Vtb_m1_ei_hb build
 	@build/tb_m1_fdc_rd/Vtb_m1_fdc_rd +dmk=build/fdc_disk.hex +tferr
 	@echo "=== tb_m1_fdc_dam (record-type bits, all four DAMs) ==="
 	@build/tb_m1_fdc_dam/Vtb_m1_fdc_dam +dmk=build/fdc_dam_disk.hex
+	@echo "=== tb_m1_fdc_ds (double-sided via drive-select bit 3) ==="
+	@build/tb_m1_fdc_ds/Vtb_m1_fdc_ds +dmk=build/fdc_ds_disk.hex
 	@echo "=== tb_m1_fdc_wr (write + flush round trip) ==="
 	@build/tb_m1_fdc_wr/Vtb_m1_fdc_wr +dmk=build/fdc_disk.hex
 	@python3 tools/check_dmk_write.py build/written_dmk.hex 2 3
@@ -127,6 +129,14 @@ build/fdcdamtest.hex: tools/build_fdc_dam_test.py
 	@mkdir -p build
 	cd . && python3 tools/build_fdc_dam_test.py
 
+build/fdcdstest.hex: tools/build_fdc_ds_test.py
+	@mkdir -p build
+	cd . && python3 tools/build_fdc_ds_test.py
+
+build/fdc_ds_disk.hex: tools/build_dmk.py
+	@mkdir -p build
+	python3 tools/build_dmk.py --out build/fdc_ds_disk --tracks 5 --sides 2
+
 build/fdc_dam_disk.hex: tools/build_dmk.py
 	@mkdir -p build
 	python3 tools/build_dmk.py --out build/fdc_dam_disk --tracks 5 --damtrk 2
@@ -182,6 +192,11 @@ build/tb_m1_fdc_dam/Vtb_m1_fdc_dam: tb_m1_fdc_dam.sv dmk_media_model.sv ../rtl/m
 	@mkdir -p build/tb_m1_fdc_dam
 	$(VERILATOR) $(VFLAGS) --Mdir build/tb_m1_fdc_dam -o Vtb_m1_fdc_dam \
 	  --top-module tb_m1_fdc_dam tb_m1_fdc_dam.sv dmk_media_model.sv ../rtl/m1_core.v $(RTL) $(CPU_RTL) ../rtl/m1_io.v ../rtl/m1_keyboard.v
+
+build/tb_m1_fdc_ds/Vtb_m1_fdc_ds: tb_m1_fdc_ds.sv dmk_media_model.sv ../rtl/m1_core.v $(RTL) $(CPU_RTL) ../rtl/m1_io.v ../rtl/m1_keyboard.v ../rtl/mcm6670_cg1.hex build/fdcdstest.hex build/fdc_ds_disk.hex
+	@mkdir -p build/tb_m1_fdc_ds
+	$(VERILATOR) $(VFLAGS) --Mdir build/tb_m1_fdc_ds -o Vtb_m1_fdc_ds \
+	  --top-module tb_m1_fdc_ds tb_m1_fdc_ds.sv dmk_media_model.sv ../rtl/m1_core.v $(RTL) $(CPU_RTL) ../rtl/m1_io.v ../rtl/m1_keyboard.v
 
 build/tb_m1_fdc_sys/Vtb_m1_fdc_sys: tb_m1_fdc_sys.sv ../rtl/m1_core.v $(RTL) $(CPU_RTL) ../rtl/m1_io.v ../rtl/m1_keyboard.v ../rtl/mcm6670_cg1.hex build/fdctest.hex
 	@mkdir -p build/tb_m1_fdc_sys
@@ -407,6 +422,21 @@ open('build/fdcdamtest12k.bin','wb').write(d + b'\0'*(12288-len(d)))"
 	  -id 600 -it -ix >/dev/null 2>&1
 	@mv build/trs80-text-0.bin build/trs80-text-fdc-dam.bin
 	@python3 tools/compare_vram.py build/trs80-text-fdc-dam.bin build/vram_fdc_dam.bin
+
+# Golden check for the double-sided convention: latch bit 3 + drive bit
+# = head 1 (NEWDOS/80 PDRIVE). The probe reads t2/s3 on side 0, side 1,
+# then side 0 again against a --sides 2 disk; trs80gp mounts the same
+# DMK and must produce the identical tag row.
+golden-fdc-ds: build/tb_m1_fdc_ds/Vtb_m1_fdc_ds build/fdcdstest.hex build/fdc_ds_disk.hex
+	@build/tb_m1_fdc_ds/Vtb_m1_fdc_ds +dmk=build/fdc_ds_disk.hex >/dev/null
+	@test -x "$(TRS80GP)" || { echo "set TRS80GP to the trs80gp binary"; exit 2; }
+	@python3 -c "d=open('build/fdcdstest.bin','rb').read(); \
+open('build/fdcdstest12k.bin','wb').write(d + b'\0'*(12288-len(d)))"
+	@rm -f build/trs80-text-0.bin
+	@cd build && "$(TRS80GP)" -m1 -mem 48 -rom fdcdstest12k.bin -d0 fdc_ds_disk.dmk -batch \
+	  -id 600 -it -ix >/dev/null 2>&1
+	@mv build/trs80-text-0.bin build/trs80-text-fdc-ds.bin
+	@python3 tools/compare_vram.py build/trs80-text-fdc-ds.bin build/vram_fdc_ds.bin
 
 # render the simulated frames as PNGs (4x, roughly CRT-ish aspect)
 frames: run

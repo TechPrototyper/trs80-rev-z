@@ -57,8 +57,8 @@ def crc16(data):
     return crc
 
 
-def sector_data(t, s):
-    rng = random.Random(t * 256 + s)
+def sector_data(t, s, side=0):
+    rng = random.Random(side * 0x8000 + t * 256 + s)
     return bytes(rng.randrange(256) for _ in range(SEC_LEN))
 
 
@@ -89,22 +89,23 @@ def boot_sector():
 DAM_CYCLE = [0xFB, 0xFA, 0xF9, 0xF8]
 
 
-def build_track(t, boot=False, dam_track=None):
+def build_track(t, boot=False, dam_track=None, side=0):
     raw = bytearray()
     pointers = []
     raw += b"\xFF" * 16                      # post-index gap
     for s in range(SPT):
         raw += b"\x00" * 6
         pointers.append(128 + len(raw))      # offset of the FE byte
-        idf = bytes([0xFE, t, 0, s, 1])
+        idf = bytes([0xFE, t, side, s, 1])
         c = crc16(idf)
         raw += idf + bytes([c >> 8, c & 0xFF])
         raw += b"\xFF" * 11 + b"\x00" * 6
-        payload = boot_sector() if boot and t == 0 and s == 0 \
-                  else sector_data(t, s)
+        payload = boot_sector() if boot and t == 0 and s == 0 and side == 0 \
+                  else sector_data(t, s, side)
         # DAM test track: sectors 0..3 carry FB/FA/F9/F8 (the 1771's four
         # record types; TRS-80 DOS directories use FA/F8), rest normal.
-        dam = DAM_CYCLE[s] if dam_track == t and s < 4 else 0xFB
+        dam = DAM_CYCLE[s] if dam_track == t and s < 4 and side == 0 \
+              else 0xFB
         dat = bytes([dam]) + payload
         c = crc16(dat)
         raw += dat + bytes([c >> 8, c & 0xFF])
@@ -183,6 +184,10 @@ def main():
     ap.add_argument("--damtrk", type=int, default=None,
                     help="SD track whose sectors 0..3 carry the DAMs"
                          " FB/FA/F9/F8 (record-type probe)")
+    ap.add_argument("--sides", type=int, default=1, choices=(1, 2),
+                    help="2: double-sided SD image (two track blocks per"
+                         " cylinder, header bit 4 clear; side selected by"
+                         " the DS drive-select convention, latch bit 3)")
     args = ap.parse_args()
 
     hdr = bytearray(16)
@@ -195,6 +200,13 @@ def main():
         img = bytes(hdr) + b"".join(
             build_track_sd_doubled(t, args.boot) if t == 0
             else build_track_dd(t) for t in range(args.tracks))
+    elif args.sides == 2:
+        hdr[2] = TRACK_LEN & 0xFF
+        hdr[3] = TRACK_LEN >> 8
+        hdr[4] = 0x40                        # SD single-byte, double-sided
+        img = bytes(hdr) + b"".join(
+            build_track(t, args.boot, args.damtrk, sd)
+            for t in range(args.tracks) for sd in (0, 1))
     else:
         hdr[2] = TRACK_LEN & 0xFF
         hdr[3] = TRACK_LEN >> 8
@@ -207,15 +219,20 @@ def main():
     with open(args.out + ".hex", "w") as f:
         f.write("\n".join(f"{b:02x}" for b in img) + "\n")
 
-    def csum(t, s):
-        return sum(sector_data(t, s)) & 0xFF
+    def csum(t, s, side=0):
+        return sum(sector_data(t, s, side)) & 0xFF
 
     probes = [(0, 0), (2, 3), (2, 7), (17, 5)]
     sums = [csum(t, s) for t, s in probes]
     assert len(set(sums)) == len(sums), "probe checksums collide"
+    extra = ""
+    if args.sides == 2:
+        s1 = csum(2, 3, 1)
+        assert s1 != sums[1], "side checksums collide"
+        extra = f" t2/s3/side1={s1:02X}"
     print(f"{args.out}.dmk: {args.tracks} tracks, {len(img)} bytes; "
           f"checksums t0/s0={sums[0]:02X} t2/s3={sums[1]:02X} "
-          f"t2/s7={sums[2]:02X} t17/s5={sums[3]:02X}")
+          f"t2/s7={sums[2]:02X} t17/s5={sums[3]:02X}" + extra)
 
 
 if __name__ == "__main__":

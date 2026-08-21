@@ -1,36 +1,25 @@
-// Testbench: the 48K machine WRITES a sector and it survives the full
-// media round trip (EI stage 5b).
+// Testbench: double-sided disks via the DS drive-select convention.
 //
-// Runs the write test image (tools/build_fdc_wr_test.py): write t2/s3
-// with a known pattern through the DRQ pull, read it back from the
-// (dirty) track buffer, then force an eviction (t5 read) so the
-// write-back travels through the media model, return and read t2/s3
-// again from the re-fetched track. Tags checked here and dumped for the
-// byte-exact golden compare (make golden-fdc-wr, trs80gp with a THROWAWAY
-// COPY of the same DMK in -d0 — trs80gp mutates its disk too).
-//
-// The bench also dumps the media model's post-run image
-// (build/written_dmk.hex); tools/check_dmk_write.py then verifies the
-// written artifact mathematically: pattern data in place AND a correct
-// CCITT CRC over DAM+data — the proof that stage-6 trs80gp (or a real
-// 1771) reading our written track would see a clean sector.
-//
-// +wp (with the write-protected +dmk image): the write must refuse with
-// status 0x40 and both readbacks must show the ORIGINAL generator
-// pattern (t2/s3 checksum 97).
+// Boots the DS probe image (tools/build_fdc_ds_test.py) on m1_core with
+// a double-sided disk in drive 0 (+dmk=build/fdc_ds_disk.hex from
+// build_dmk.py --sides 2 — two track blocks per cylinder, distinct data
+// per side). Latch bit 3 together with a drive bit selects head 1
+// (0x09 = drive 0, side 1 — the NEWDOS/80 PDRIVE convention probed from
+// the nd80206 boot sector). The probe reads t2/s3 on side 0, side 1,
+// then side 0 again; the checksums must differ between sides and swing
+// back — proving both the head switch and that the FDC track buffer is
+// keyed by side. VRAM dumped for the golden compare (make
+// golden-fdc-ds, the same DMK in trs80gp -d0).
 
 `timescale 1ns / 1ps
 
-module tb_m1_fdc_wr;
+module tb_m1_fdc_ds;
 
     logic clk, rst_n;
     initial begin clk = 0; rst_n = 0; end
     always #46.97 clk = ~clk;
 
     int errors = 0;
-
-    bit wp;
-    initial wp = $test$plusargs("wp");
 
     logic        ld_en;
     logic [13:0] ld_addr;
@@ -52,7 +41,7 @@ module tb_m1_fdc_wr;
         .test_n(1'b1), .int_n(1'b1), .wait_n(1'b1),
         .ld_en(ld_en), .ld_addr(ld_addr), .ld_data(ld_data),
         .ei_ram_cfg(2'b10),
-        .fdc_disk(4'b0001),
+        .fdc_disk(4'b0001),   // a disk in drive 0, as trs80gp -d0
         .trk_req(trk_req), .trk_drv(trk_drv), .trk_track(trk_track),
         .trk_side(trk_side),
         .trk_vld(trk_vld), .trk_data(trk_data), .trk_idx(trk_idx),
@@ -89,7 +78,7 @@ module tb_m1_fdc_wr;
     );
 
     logic [7:0] image [0:4095];
-    initial $readmemh("build/fdcwrtest.hex", image);
+    initial $readmemh("build/fdcdstest.hex", image);
 
     bit checks_on, done;
     initial begin checks_on = 0; done = 0; end
@@ -134,43 +123,28 @@ module tb_m1_fdc_wr;
         wait (done);
         repeat (8) @(negedge clk);
 
-        expect_row(10'd0, "WS", "banner");
-        if (wp) begin
-            expect_row(10'd4,   "4000",   "row 0 (write refused)");
-            expect_row(10'd68,  "000097", "row 1 (original pattern)");
-            expect_row(10'd132, "000097", "row 2 (original pattern)");
-        end else begin
-            expect_row(10'd4,   "0000",   "row 0 (write ok, 256 fed)");
-            expect_row(10'd68,  "000080", "row 1 (buffer readback)");
-            expect_row(10'd132, "000080", "row 2 (after flush+refetch)");
-        end
+        expect_row(10'd0, "DS", "banner");
+        expect_row(10'd4, "0000970000F997",
+                   "row 0 (side 0 / side 1 / side 0 reads)");
 
         if (errors == 0)
-            $display("  ok  all write tags in place (%s)",
-                     wp ? "write-protect" : "write+flush");
+            $display("  ok  both heads read distinct data, re-keyed buffer");
 
-        fd = $fopen(wp ? "build/vram_fdc_wp.bin" : "build/vram_fdc_wr.bin",
-                    "wb");
+        fd = $fopen("build/vram_fdc_ds.bin", "wb");
         for (i = 0; i < 1024; i++)
             $fwrite(fd, "%c", vram_byte(10'(i)));
         $fclose(fd);
+        $display("  ok  VRAM dumped: build/vram_fdc_ds.bin");
 
-        if (!wp) begin
-            // post-run media for the artifact CRC check
-            $writememh("build/written_dmk.hex", u_media.mem);
-            $display("  ok  written media dumped: build/written_dmk.hex");
-        end
-
-        if (errors == 0) $display("ALL CHECKS PASSED (%s)",
-                                  wp ? "wp refusal" : "write round trip");
+        if (errors == 0) $display("ALL CHECKS PASSED (double-sided reads)");
         else             $display("%0d CHECKS FAILED", errors);
         if (errors != 0) $fatal(1);
         $finish;
     end
 
     initial begin
-        #4_000_000_000;
-        $fatal(1, "watchdog: FDC write test did not reach the marker");
+        #6_000_000_000;
+        $fatal(1, "watchdog: FDC DS test did not reach the marker");
     end
 
 endmodule

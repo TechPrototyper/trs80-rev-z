@@ -14,6 +14,7 @@ module dmk_media_model (
     input  logic        trk_req,
     input  logic [1:0]  trk_drv,     // single image: drive ignored
     input  logic [6:0]  trk_track,
+    input  logic        trk_side,    // double-sided DMK: block 2 per cyl
     output logic        trk_vld,
     output logic [7:0]  trk_data,
     output logic [12:0] trk_idx,
@@ -35,6 +36,7 @@ module dmk_media_model (
     logic [7:0] mem [0:262143];      // up to 256 KiB of image
     int         tracklen;
     int         ntracks;
+    int         sides;
     bit         fail, wbfail;
 
     initial begin
@@ -51,20 +53,25 @@ module dmk_media_model (
             trk_len  = 13'(tracklen);
             // bits 6/7 set = single-density bytes stored once
             trk_dbl  = (mem[4] & 8'hC0) == 8'h00;
+            // bit 4 set = single-sided; clear = two blocks per cylinder
+            sides    = ((mem[4] & 8'h10) == 8'h00) ? 2 : 1;
             trk_wp   = (mem[0] == 8'hFF);
         end else begin
             ntracks = 0; tracklen = 0; trk_len = 0; trk_dbl = 0; trk_wp = 0;
+            sides = 1;
         end
     end
 
     always @(posedge clk) begin
         if (trk_req) begin
-            if (fail || int'(trk_track) >= ntracks) begin
+            if (fail || int'(trk_track) >= ntracks
+                || (trk_side && sides == 1)) begin
                 trk_err <= 1;
                 @(posedge clk);
                 trk_err <= 0;
             end else begin
-                automatic int base = 16 + int'(trk_track) * tracklen;
+                automatic int base = 16
+                    + (int'(trk_track) * sides + int'(trk_side)) * tracklen;
                 for (int i = 0; i < tracklen; i++) begin
                     @(posedge clk);
                     trk_vld  <= 1;
@@ -83,12 +90,14 @@ module dmk_media_model (
 
     always @(posedge clk) begin
         if (trk_wb_req) begin
-            if (wbfail || int'(trk_track) >= ntracks) begin
+            if (wbfail || int'(trk_track) >= ntracks
+                || (trk_side && sides == 1)) begin
                 trk_wb_err <= 1;
                 @(posedge clk);
                 trk_wb_err <= 0;
             end else begin
-                automatic int base = 16 + int'(trk_track) * tracklen;
+                automatic int base = 16
+                    + (int'(trk_track) * sides + int'(trk_side)) * tracklen;
                 for (int i = 0; i < tracklen; i++) begin
                     @(posedge clk);
                     trk_wb_fetch <= 1;

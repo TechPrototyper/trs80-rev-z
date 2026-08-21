@@ -39,12 +39,20 @@ module m1_drives #(
     output wire       wprt,
     output wire       ready,
     output wire [1:0] sel_idx,      // selected drive index (FDC track fetch)
-    output wire [6:0] pos_sel       // its head position
+    output wire [6:0] pos_sel,      // its head position
+    output wire       side          // head 1 selected (see below)
 );
 
     // selected drive: lowest set select line wins (one-hot by convention)
     wire       any_sel = |ds;
     wire [1:0] seli = ds[0] ? 2'd0 : ds[1] ? 2'd1 : ds[2] ? 2'd2 : 2'd3;
+
+    // Double-sided convention (NEWDOS/80 PDRIVE, probed from the nd80206
+    // boot sector 2026-08-20): DS3 is rewired to the drives' side-select
+    // pin, so latch bit 3 TOGETHER with a drive bit means side 1 of that
+    // drive (0x09 = drive 0, head 1). Bit 3 alone still selects drive 3,
+    // head 0 — a cable choice: either a fourth drive or second heads.
+    assign side = ds[3] && (ds[2:0] != 3'b000);
     assign sel_idx = seli;
     assign pos_sel = pos[seli];
 

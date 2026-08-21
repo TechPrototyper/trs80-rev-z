@@ -36,6 +36,7 @@ module tb_m1_fdc_rd;
     wire        trk_req;
     wire [1:0]  trk_drv;
     wire [6:0]  trk_track;
+    wire        trk_side;
     wire        trk_vld, trk_done, trk_err, trk_dbl, trk_wp;
     wire [7:0]  trk_data;
     wire [12:0] trk_idx, trk_len;
@@ -50,6 +51,7 @@ module tb_m1_fdc_rd;
         .ei_ram_cfg(2'b10),
         .fdc_disk(4'b0001),   // a disk in drive 0, as trs80gp -d0
         .trk_req(trk_req), .trk_drv(trk_drv), .trk_track(trk_track),
+        .trk_side(trk_side),
         .trk_vld(trk_vld), .trk_data(trk_data), .trk_idx(trk_idx),
         .trk_done(trk_done), .trk_err(trk_err),
         .trk_len(trk_len), .trk_dbl(trk_dbl),
@@ -74,6 +76,7 @@ module tb_m1_fdc_rd;
     dmk_media_model u_media (
         .clk(clk),
         .trk_req(trk_req), .trk_drv(trk_drv), .trk_track(trk_track),
+        .trk_side(trk_side),
         .trk_vld(trk_vld), .trk_data(trk_data), .trk_idx(trk_idx),
         .trk_done(trk_done), .trk_err(trk_err),
         .trk_len(trk_len), .trk_dbl(trk_dbl), .trk_wp(trk_wp),

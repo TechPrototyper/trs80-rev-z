@@ -56,6 +56,7 @@ module m1_ei #(
     output wire        trk_req,
     output wire [1:0]  trk_drv,
     output wire [6:0]  trk_track,
+    output wire        trk_side,
     input  wire        trk_vld,
     input  wire [7:0]  trk_data,
     input  wire [12:0] trk_idx,
@@ -150,6 +151,7 @@ module m1_ei #(
     wire       drv_tr00, drv_ip, drv_wprt, drv_ready;
     wire [1:0] drv_sel_idx;
     wire [6:0] drv_pos_sel;
+    wire       drv_side;
 
     m1_fdc u_fdc (
         .clk(clk), .rst_n(rst_n), .en_1m(en_1m),
@@ -159,8 +161,9 @@ module m1_ei #(
         .intrq(fdc_intrq),
         .step(fdc_step), .dirc(fdc_dirc),
         .tr00(drv_tr00), .ip(drv_ip), .wprt(drv_wprt), .ready(drv_ready),
-        .sel_drv(drv_sel_idx), .pos_sel(drv_pos_sel),
+        .sel_drv(drv_sel_idx), .pos_sel(drv_pos_sel), .sel_side(drv_side),
         .trk_req(trk_req), .trk_drv(trk_drv), .trk_track(trk_track),
+        .trk_side(trk_side),
         .trk_vld(trk_vld), .trk_data(trk_data), .trk_idx(trk_idx),
         .trk_done(trk_done), .trk_err(trk_err),
         .trk_len(trk_len), .trk_dbl(trk_dbl),
@@ -175,7 +178,7 @@ module m1_ei #(
         .disk_wp(disk_wp),
         .step(fdc_step), .dirc(fdc_dirc),
         .tr00(drv_tr00), .ip(drv_ip), .wprt(drv_wprt), .ready(drv_ready),
-        .sel_idx(drv_sel_idx), .pos_sel(drv_pos_sel)
+        .sel_idx(drv_sel_idx), .pos_sel(drv_pos_sel), .side(drv_side)
     );
 
     assign int_n   = ~(en && (rtc_pending || fdc_intrq));
