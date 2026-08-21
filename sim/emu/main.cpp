@@ -401,6 +401,7 @@ int main(int argc, char** argv)
     int         cas_baud = 500;
     bool        sound    = true;
     int         volume   = 60;
+    bool        volume_set = false;
     bool        hidden   = false;
     std::string skin_name = "none";
     std::string shot_path;
@@ -408,7 +409,7 @@ int main(int argc, char** argv)
     std::string sound_dump;
     bool        drive_sounds = true;
     std::string drive_dir;
-    double      click_pitch = 0.65;
+    double      click_pitch = 1.0;
 
     for (int i = 1; i < argc; i++) {
         std::string a(argv[i]);
@@ -443,7 +444,7 @@ int main(int argc, char** argv)
         else if ((v = arg_value(a, "--skin=")) != "") { skin_name = v; }
         else if ((v = arg_value(a, "--shot=")) != "") { shot_path = v; }
         else if ((v = arg_value(a, "--shot-at=")) != "") { shot_at = atoi(v.c_str()); }
-        else if ((v = arg_value(a, "--volume=")) != "") { volume = atoi(v.c_str()); }
+        else if ((v = arg_value(a, "--volume=")) != "") { volume = atoi(v.c_str()); volume_set = true; }
         else if ((v = arg_value(a, "--sound-dump=")) != "") { sound_dump = v; }
         else if (a == "--no-drive-sounds") { drive_sounds = false; }
         else if ((v = arg_value(a, "--drive-sounds=")) != "") { drive_dir = v; }
@@ -476,6 +477,10 @@ int main(int argc, char** argv)
         return 1;
     if (!cas_save.empty())
         cass.record_to(cas_save);
+    // hidden runs are scripted runs: keep them out of the speakers
+    // (two machines mixing live once produced a memorably awful chord)
+    if (hidden && !volume_set)
+        sound = false;
     EmuAudio audio;
     if (sound)
         sound = audio.init(volume);

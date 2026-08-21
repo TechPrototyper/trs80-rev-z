@@ -46,14 +46,22 @@ public:
 
     // Load real recordings from a directory (WAV, mono/stereo, 16-bit,
     // any rate): "seek_step_trs80.wav"/"step.wav" for the arm,
-    // "motor_trs80.wav"/"motor_loop.wav" as the spindle loop. Missing
-    // files fall back to the synthesized voice; without the option the
-    // engine is fully procedural (the repo ships no audio assets).
+    // "loaded-spin.wav"/"motor_trs80.wav"/"motor_loop.wav" as the
+    // spindle loop, "motor_spinup.wav"/"motor.wav" as a one-shot
+    // spin-up whirr layered under motor start. The names cover both
+    // our asset kit and trs80gp's Resources directory, so
+    //   --drive-sounds=/Applications/trs80gp.app/Contents/Resources
+    // plays George Phillips' reference recordings straight from the
+    // user's own trs80gp install (nothing is copied or redistributed).
+    // Missing files fall back to the synthesized voice; without the
+    // option the engine is fully procedural (the repo ships no audio
+    // assets).
     void load_drive_samples(const std::string& dir);
 
-    // Playback-rate factor for the step voice (default 0.65: the arm
-    // knock sits lower and thicker than the raw sample) — a knob for
-    // the maintainer's ear instead of another guessing round.
+    // Playback-rate factor for the step voice (default 1.0: samples
+    // play at their native pitch; the bass comes from the fixed 63 Hz
+    // chassis thump underneath) — a knob for the maintainer's ear
+    // instead of another guessing round.
     void set_click_pitch(float f)
     {
         if (f < 0.2f) f = 0.2f;
@@ -93,11 +101,12 @@ private:
 
     // sample players (loaded voices; -1 position = idle)
     struct Samp { std::vector<float> d; float inc = 1.0f; };
-    Samp     smp_step_, smp_motor_;
-    float    click_pitch_ = 0.65f;
+    Samp     smp_step_, smp_motor_, smp_spin_;
+    float    click_pitch_ = 1.0f;
     float    sp_pos_[4] = {-1, -1, -1, -1};
     float    sp_amp_[4] = {0, 0, 0, 0};
     float    mp_pos_[4] = {0, 0, 0, 0};
+    float    spin_pos_[4] = {-1, -1, -1, -1};  // spin-up one-shot
 
     static bool load_wav_mono(const std::string& path, Samp& out);
 

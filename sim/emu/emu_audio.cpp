@@ -147,20 +147,30 @@ bool EmuAudio::load_wav_mono(const std::string& path, Samp& out)
 
 void EmuAudio::load_drive_samples(const std::string& dir)
 {
+    // Name lists cover our asset kit AND trs80gp's Resources dir —
+    // loaded-spin/motor/step are George Phillips' reference recordings
+    // (played in place from the user's install, never redistributed).
     static const char* step_names[]  = {"seek_step_trs80.wav", "step.wav"};
-    static const char* motor_names[] = {"motor_trs80.wav",
+    static const char* motor_names[] = {"loaded-spin.wav",
+                                        "motor_trs80.wav",
                                         "motor_loop.wav"};
+    static const char* spin_names[]  = {"motor_spinup.wav", "motor.wav"};
     for (auto* nm : step_names)
         if (smp_step_.d.empty())
             load_wav_mono(dir + "/" + nm, smp_step_);
     for (auto* nm : motor_names)
         if (smp_motor_.d.empty())
             load_wav_mono(dir + "/" + nm, smp_motor_);
+    for (auto* nm : spin_names)
+        if (smp_spin_.d.empty())
+            load_wav_mono(dir + "/" + nm, smp_spin_);
     fprintf(stderr,
-            "emu_audio: drive samples from %s — step %s, motor %s\n",
+            "emu_audio: drive samples from %s — step %s, motor %s, "
+            "spin-up %s\n",
             dir.c_str(),
             smp_step_.d.empty()  ? "SYNTH" : "loaded",
-            smp_motor_.d.empty() ? "SYNTH" : "loaded");
+            smp_motor_.d.empty() ? "SYNTH" : "loaded",
+            smp_spin_.d.empty()  ? "none"  : "loaded");
 }
 
 static inline float samp_at(const std::vector<float>& v, float pos)
@@ -203,10 +213,19 @@ float EmuAudio::drive_mix()
             }
         }
 
+        // spin-up whirr: one-shot layered under motor start (the
+        // spindle's belt squeal before the steady hum settles)
+        if (!smp_spin_.d.empty() && spin_pos_[d] >= 0.0f) {
+            out += samp_at(smp_spin_.d, spin_pos_[d]) * 0.9f;
+            spin_pos_[d] += smp_spin_.inc * detune[d];
+            if (spin_pos_[d] >= (float)smp_spin_.d.size() - 2.0f)
+                spin_pos_[d] = -1.0f;
+        }
+
         // step voice from a real recording: per-drive player, slight
         // pitch color from the detune, amplitude jitter per hit
         if (!smp_step_.d.empty() && sp_pos_[d] >= 0.0f) {
-            out += samp_at(smp_step_.d, sp_pos_[d]) * sp_amp_[d] * 1.4f;
+            out += samp_at(smp_step_.d, sp_pos_[d]) * sp_amp_[d] * 1.6f;
             sp_pos_[d] += smp_step_.inc * detune[d] * click_pitch_;
             if (sp_pos_[d] >= (float)smp_step_.d.size() - 2.0f)
                 sp_pos_[d] = -1.0f;
@@ -226,11 +245,11 @@ float EmuAudio::drive_mix()
     // the chassis, the "bass" a close-mic click alone lacks
     if (body_env_ > 0.0008f) {
         ring = true;
-        body_ph_ += 2.0f * (float)M_PI * 170.0f * click_pitch_ / 44100.0f;
+        body_ph_ += 2.0f * (float)M_PI * 63.0f / 44100.0f;
         if (body_ph_ > 2.0f * (float)M_PI)
             body_ph_ -= 2.0f * (float)M_PI;
-        knock += 0.8f * body_env_ * sinf(body_ph_);
-        body_env_ *= 0.9989f;               // ~20 ms
+        knock += 0.45f * body_env_ * sinf(body_ph_);
+        body_env_ *= 0.99935f;              // ~35 ms — full, not a tick
     }
     for (int m = 0; m < 3; m++) {
         if (ck_env_[m] > 0.0005f) {
@@ -279,6 +298,8 @@ void EmuAudio::tick(uint8_t ladder, uint8_t snd, uint8_t disks)
     bool motor = (snd & 0x04) != 0;
     for (int d = 0; d < 4; d++) {
         if (drives_on_ && motor && (disks & (1 << d))) {
+            if (menv_[d] <= 0.0f && !smp_spin_.d.empty())
+                spin_pos_[d] = 0.0f;       // motor-on edge: play spin-up
             menv_[d] += 6.5e-5f * (1.2f - menv_[d]);   // ~0.35 s spin-up
             if (menv_[d] > 1.0f) menv_[d] = 1.0f;
         } else {
