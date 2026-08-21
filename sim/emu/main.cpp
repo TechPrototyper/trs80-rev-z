@@ -43,6 +43,7 @@
 #include "verilated.h"
 #include "verilated_vcd_c.h"
 
+#include "emu_cass.h"
 #include "emu_disk.h"
 #include "emu_keyboard.h"
 #include "emu_display.h"
@@ -166,6 +167,12 @@ public:
             char c = text[i];
             if (c == '\\' && i + 1 < text.size() && text[i+1] == 'n')
                 { c = '\n'; i++; }
+            else if (c == '\\' && i + 1 < text.size() && text[i+1] == 'w') {
+                // "\w": wait ~5 machine seconds (tape loads, overlays)
+                steps_.push_back({0, 300});
+                i++;
+                continue;
+            }
             uint64_t m = glyph_mask(c);
             if (!m) continue;                    // no Model 1 equivalent
             steps_.push_back({m, 14});           // held (> 2 DOS scan ticks)
@@ -313,6 +320,8 @@ int main(int argc, char** argv)
     std::string pctrace;          // "lo:hi:file" — instruction-fetch PC log
     int         enter_until = 0;  // hold ENTER until this frame (boot skips)
     std::string kbd_layout = "us";
+    std::string cas_path;
+    int         cas_baud = 500;
 
     for (int i = 1; i < argc; i++) {
         std::string a(argv[i]);
@@ -335,6 +344,8 @@ int main(int argc, char** argv)
         else if ((v = arg_value(a, "--pctrace=")) != "") { pctrace = v; }
         else if ((v = arg_value(a, "--enter-until=")) != "") { enter_until = atoi(v.c_str()); }
         else if ((v = arg_value(a, "--kbd=")) != "") { kbd_layout = v; }
+        else if ((v = arg_value(a, "--cas=")) != "") { cas_path = v; }
+        else if ((v = arg_value(a, "--cas-baud=")) != "") { cas_baud = atoi(v.c_str()); }
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
@@ -358,6 +369,9 @@ int main(int argc, char** argv)
 
     // ---- Instantiate models ----
     EmuDisk     disk(disk_paths, disk_wp);
+    EmuCassette cass;
+    if (!cas_path.empty() && !cass.load(cas_path, cas_baud))
+        return 1;
     EmuKeyboard kbd;
     if (kbd_layout == "de") {
         kbd.set_layout(EmuKeyboard::Layout::DE);
@@ -516,6 +530,11 @@ int main(int argc, char** argv)
         top.trk_wb_idx   = disk.trk_wb_idx;
         top.trk_wb_done  = disk.trk_wb_done;
         top.trk_wb_err   = disk.trk_wb_err;
+
+        // --- Cassette deck: motor-gated tape into cass_in ---
+        cass.motor  = top.cass_motor;
+        cass.tick();
+        top.cass_in = cass.out;
 
         // --- Update keyboard matrix (live keyboard + scripted input) ---
         top.keys = kbd.keys() | autotype.keys();

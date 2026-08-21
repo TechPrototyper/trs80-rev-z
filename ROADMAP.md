@@ -111,8 +111,12 @@ VRAM comparison against trs80gp, then on the ULX3S over HDMI with a USB keyboard
       cassette-input edges; the 2-bit output ladder into R53–R56 + motor
       relay consumer — the open items from
       [chapter 6](docs/chapters/06-io-ports.md)); `.cas`/WAV on the SD card
-- [ ] Machine-language round-trip: the existing assembly-language WAV corpus
-      loads correctly (read path only — these files already exist)
+- [X] Machine-language round-trip: the existing assembly-language WAV corpus
+      loads correctly (read path only — these files already exist).
+      *Verified 2026-08-21: `make golden-cass` (probe ROM + the same .cas in
+      trs80gp's deck, byte-exact) and the acceptance form — Space Invaders'
+      500-baud **WAV** loaded via Level II `SYSTEM`, all 15 records
+      byte-exact in RAM (Z4 detector in the media layer, `emu --cas=`).*
 - [ ] BASIC round-trip: `CSAVE` writes a WAV, `CLOAD` reads it back
       byte-exact (write path, too — no assembly-only corpus covers this)
 - [ ] TBUG/`SYSTEM` round-trip: a TBUG-written machine-code tape (SYSTEM
