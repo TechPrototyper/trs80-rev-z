@@ -41,11 +41,12 @@ the days, which was sold, unfortunately, because we still had and kept the Model
   ["TRS-80 model 1" (Flickr, via Wikimedia Commons)](https://commons.wikimedia.org/wiki/File:TRS-80_model_1_(17348455071).jpg),
   **CC BY 2.0**. Cropped to the monitor front and the lit test pattern retouched
   to an unpowered tube for the emulator's grey skin (`assets/skin_grey.jpg`).
-- **Flominator / ProhibitOnions** — photograph of a TRS-80 Model I system at the
-  Rechnermuseum der FH Furtwangen,
-  ["TRS-80 Model I - Rechnermuseum Cropped" (Wikimedia Commons)](https://commons.wikimedia.org/wiki/File:TRS-80_Model_I_-_Rechnermuseum_Cropped.jpg),
-  **CC BY-SA 3.0**. Cropped to the monitor front for the emulator's green skin
-  (`assets/skin_green.jpg`, itself CC BY-SA 3.0 as a derivative).
+- **Prolete** — frontal photograph of the later TRS-80 Video Display revision
+  (full smoked front plate, BRIGHT/CONTRAST/POWER knobs),
+  ["Tandy TRS-80 Model I" (Wikimedia Commons)](https://commons.wikimedia.org/wiki/File:Tandy_TRS-80_Model_I.jpg),
+  **CC0 (public domain)**. Cropped to the monitor, white-balanced and a glass
+  reflection retouched out for the emulator's green skin
+  (`assets/skin_green.jpg`).
 - **Sean Barrett (nothings)** — `stb_image.h` v2.30, single-header image decoder
   (public domain / MIT dual license), vendored unmodified as
   `sim/emu/third_party/stb_image.h` to load the JPEG skin assets.

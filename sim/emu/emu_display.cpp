@@ -132,7 +132,7 @@ EmuDisplay::EmuDisplay(int scale, bool hidden, Skin skin)
         if (photo_ok_ && skin_ == Skin::GREY)
             build_grid(452.0f, 315.0f, 292.0f, 232.0f);
         else if (photo_ok_)
-            build_grid(381.0f, 303.0f, 258.0f, 200.0f);
+            build_grid(370.0f, 345.0f, 272.0f, 225.0f);
         else
             build_grid(520.0f, 356.0f, 348.0f, 238.0f);
     }
@@ -143,10 +143,11 @@ EmuDisplay::EmuDisplay(int scale, bool hidden, Skin skin)
 // Load the photographic monitor front for the chosen skin.
 // assets/skin_grey.jpg: Tandy Video Display, cropped from "TRS-80
 // model 1" by Jason Scott (Wikimedia Commons, CC BY 2.0), lit test
-// pattern retouched to an unpowered tube. assets/skin_green.jpg:
-// cropped from "TRS-80 Model I - Rechnermuseum" by Flominator/
-// ProhibitOnions (Wikimedia Commons, CC BY-SA 3.0). Full provenance
-// in CREDITS.md.
+// pattern retouched to an unpowered tube. assets/skin_green.jpg: the
+// LATER Video Display revision (full smoked front plate, three
+// BRIGHT/CONTRAST/POWER knobs — the first-series case never shipped
+// green), cropped from "Tandy TRS-80 Model I" by Prolete (Wikimedia
+// Commons, CC0). Full provenance in CREDITS.md.
 bool EmuDisplay::load_photo()
 {
     const char* name = (skin_ == Skin::GREY) ? "skin_grey.jpg"
