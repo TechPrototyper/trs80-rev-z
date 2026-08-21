@@ -225,6 +225,20 @@ off to the bit-exact stock machine.
 - [ ] Board side of the drive sounds (audio_r channel) and the
       emulator's insert/eject/door sounds — the latter need runtime
       media swaps, i.e. the companion UI.
+- [ ] "Academic" skin pass: product-style imagery (frontal, no
+      surroundings), the EXACT case/bezel dimensions and the EXACT
+      tube curvature from period sources (the Video Display was a
+      modified RCA 12" b/w set — service manual / CRT datasheet), and
+      a projection modelled from those numbers instead of today's
+      eyeballed barrel constant. The screen-area background tone is
+      fully ours to choose — Verilator only delivers pixel bits, the
+      SDL renderer paints phosphor and background.
+- [ ] Our own drive-sound recordings (arm/head clack + motor loop) to
+      replace the trs80gp files loaded from the user's install — target
+      spectra are measured and documented (355–830 Hz loop with 5 Hz
+      rotation wow; 61 ms step at 100 Hz + 0.9–1.4 kHz; step:loop RMS
+      ≈ 4:1). The trs80gp set stays the default until the maintainer
+      signs off the replacement as better.
 
 ### M5 — RS-232-C
 
