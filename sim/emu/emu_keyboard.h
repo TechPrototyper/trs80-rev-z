@@ -24,7 +24,15 @@
 
 class EmuKeyboard {
 public:
+    enum class Layout { US, DE };
+
     EmuKeyboard() : keys_(0) {}
+
+    // Host keyboard layout: scancodes are physical (HID), so producing
+    // the glyph printed on the key needs the host layout. US is the
+    // m1_hid_keys.v transcription; DE maps the German legends (Y/Z
+    // swapped, ':' on shift+'.', '+'/'*' key, '#'/'\'' key, ...).
+    void set_layout(Layout l) { layout_ = l; }
 
     // Rebuild the matrix from SDL_GetKeyboardState. Call once per frame,
     // after the SDL event queue has been pumped (SDL_PollEvent does that).
@@ -35,6 +43,7 @@ public:
 
 private:
     uint64_t keys_;
+    Layout   layout_ = Layout::US;
 
     // (shift, HID scancode) -> matrix cell with optional shift override;
     // transcribed from m1_hid_keys.v map_key. Returns false if the glyph
@@ -42,4 +51,9 @@ private:
     static bool map_key(bool shifted, int scancode,
                         int& row, int& col,
                         bool& force_on, bool& force_off);
+
+    // Same contract for a German (QWERTZ) host keyboard.
+    static bool map_key_de(bool shifted, int scancode,
+                           int& row, int& col,
+                           bool& force_on, bool& force_off);
 };

@@ -73,6 +73,7 @@ drives 0–3 only; drive numbers above 3 do not exist.
 | `--no-ei` | off | 16K machine (no Expansion Interface or FDC) |
 | `--ei16` | off | 32K machine |
 | `--ei32` | **default** | 48K machine (full Expansion Interface) |
+| `--kbd=<layout>` | `us` | Host keyboard layout (`us` or `de`) — scancodes are physical, so this decides which legend a key produces (QWERTZ swaps Y/Z, `:` sits on shift+`.`, …) |
 | `--debug-pty` | off | Expose the `m1_debug` binary-v0 link on a pseudo-tty |
 | `--pctrace=lo:hi:file` | off | Log every instruction-fetch PC in `[lo,hi]` (hex) to *file*, one `@xxxx` line each — diffable against `trs80gp -tr lo:hi` (this is how the NEWDOS lookup and aj6 boot divergences were root-caused) |
 | `--enter-until=<frame>` | off | Hold ENTER from power-on until the given frame (some DOS mods skip boot prompts on a held ENTER) |

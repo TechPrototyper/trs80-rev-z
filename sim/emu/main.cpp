@@ -17,6 +17,9 @@
 //   --ei32            Set ei_ram_cfg=10 (48K machine, default)
 //   --no-percom       Percom Doubler absent (default: fitted, like DIP4 OFF
 //                     on the board) — some DOS boot paths probe the doubler
+//   --kbd=<layout>    Host keyboard layout: us (default) or de. Scancodes
+//                     are physical, so this decides which legend a key
+//                     produces (de: QWERTZ, ':' on shift+'.', etc.)
 //   --type=<text>     Auto-type text into the machine ("\n" = ENTER), e.g.
 //                     --type="BASIC\n". Starts after --type-at frames.
 //   --type-at=<n>     First frame of auto-typing (default 900, ~15 machine
@@ -124,14 +127,23 @@ public:
 
     void wait_for_tick()
     {
-        // Target time for tick_: tick_ * 93.96 ns (half-period at 10.6445 MHz).
-        // We advance one rising edge per tick, so period = 93.96 ns.
-        ++tick_;
+        // Target time for tick_: tick_ * 93.96 ns (period at 10.6445 MHz;
+        // one rising edge per tick). Sleeping every tick would issue a
+        // syscall per 94 ns of emulated time — macOS sleep granularity is
+        // ~1 ms, so that ran far BELOW real time. Instead re-sync once
+        // every 16384 ticks (~1.5 ms emulated), which a sleep can
+        // actually honor.
+        if (((++tick_) & 0x3FFF) != 0)
+            return;
         using ns = std::chrono::nanoseconds;
         auto target = start_ + ns(static_cast<long long>(tick_) * 93960LL / 1000);
         auto now    = std::chrono::steady_clock::now();
         if (now < target)
             std::this_thread::sleep_until(target);
+        else if (now - target > std::chrono::milliseconds(250))
+            start_ = now - ns(static_cast<long long>(tick_) * 93960LL / 1000);
+            // fell behind (window drag, heavy sim stretch): re-anchor
+            // instead of racing to catch up
     }
 
 private:
@@ -300,6 +312,7 @@ int main(int argc, char** argv)
     int         ei_cfg     = 2;   // 48K by default
     std::string pctrace;          // "lo:hi:file" — instruction-fetch PC log
     int         enter_until = 0;  // hold ENTER until this frame (boot skips)
+    std::string kbd_layout = "us";
 
     for (int i = 1; i < argc; i++) {
         std::string a(argv[i]);
@@ -321,6 +334,7 @@ int main(int argc, char** argv)
         else if ((v = arg_value(a, "--type-at=")) != "") { type_at = atoi(v.c_str()); }
         else if ((v = arg_value(a, "--pctrace=")) != "") { pctrace = v; }
         else if ((v = arg_value(a, "--enter-until=")) != "") { enter_until = atoi(v.c_str()); }
+        else if ((v = arg_value(a, "--kbd=")) != "") { kbd_layout = v; }
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
@@ -345,6 +359,13 @@ int main(int argc, char** argv)
     // ---- Instantiate models ----
     EmuDisk     disk(disk_paths, disk_wp);
     EmuKeyboard kbd;
+    if (kbd_layout == "de") {
+        kbd.set_layout(EmuKeyboard::Layout::DE);
+    } else if (kbd_layout != "us") {
+        fprintf(stderr, "--kbd: unknown layout '%s' (us, de)\n",
+                kbd_layout.c_str());
+        return 1;
+    }
     EmuDisplay  disp(scale);
     DebugPty    dbg;
     if (debug_pty && !dbg.open()) return 1;

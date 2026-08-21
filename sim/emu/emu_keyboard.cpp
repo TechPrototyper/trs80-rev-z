@@ -96,6 +96,93 @@ bool EmuKeyboard::map_key(bool shifted, int scancode,
     }
 }
 
+// German (QWERTZ) host keyboard: same glyph-faithful idea, but the key
+// legends differ — Y/Z swapped, '"' on shift+2, '&' on shift+6, '/' on
+// shift+7, '(' ')' on shift+8/9, '=' on shift+0, '?' on shift+ß, the
+// '+'/'*' and '#'/'\'' keys, '<'/'>' on the ISO key, ';' ':' on
+// shift+','/'.'  Umlaut keys have no Model 1 glyph; Ö keeps the US
+// ';'/':' as a convenience since that position is muscle memory.
+bool EmuKeyboard::map_key_de(bool shifted, int scancode,
+                             int& row, int& col,
+                             bool& force_on, bool& force_off)
+{
+    force_on  = false;
+    force_off = false;
+
+    switch (scancode) {
+    // QWERTZ: the physical Y position carries Z and vice versa.
+    case SDL_SCANCODE_Y: row=3; col=2; return true;          // legend Z
+    case SDL_SCANCODE_Z: row=3; col=1; return true;          // legend Y
+
+    // Digit row, German legends. Native M1 chords pass shift through.
+    case SDL_SCANCODE_1: row=4; col=1; return true;          // 1 / !
+    case SDL_SCANCODE_2: row=4; col=2; return true;          // 2 / "
+    case SDL_SCANCODE_3:
+        if (shifted) return false;                           // § has no M1 key
+        row=4; col=3; return true;
+    case SDL_SCANCODE_4: row=4; col=4; return true;          // 4 / $
+    case SDL_SCANCODE_5: row=4; col=5; return true;          // 5 / %
+    case SDL_SCANCODE_6: row=4; col=6; return true;          // 6 / &
+    case SDL_SCANCODE_7:
+        if (shifted) { row=5; col=7; force_off=true; }       // / unshifted on M1
+        else         { row=4; col=7; }
+        return true;
+    case SDL_SCANCODE_8: row=5; col=0; return true;          // 8 / (
+    case SDL_SCANCODE_9: row=5; col=1; return true;          // 9 / )
+    case SDL_SCANCODE_0:
+        if (shifted) { row=5; col=5; }                       // = = M1 shift+-
+        else         { row=4; col=0; }
+        return true;
+    case SDL_SCANCODE_MINUS:                                 // ß / ?
+        if (shifted) { row=5; col=7; return true; }          // ? = M1 shift+/
+        return false;                                        // ß has no M1 key
+    case SDL_SCANCODE_EQUALS: return false;                  // ´ / `
+
+    // Ü has no M1 glyph; the +/* key right of it:
+    case SDL_SCANCODE_LEFTBRACKET: return false;
+    case SDL_SCANCODE_RIGHTBRACKET:
+        if (shifted) { row=5; col=2; }                       // * = M1 shift+:
+        else         { row=5; col=3; force_on=true; }        // + = M1 shift+;
+        return true;
+
+    // Ö: convenience — keep the US ';'/':' of that position.
+    case SDL_SCANCODE_SEMICOLON:
+        if (shifted) { row=5; col=2; force_off=true; }       // : unshifted on M1
+        else         { row=5; col=3; force_off=true; }       // ; unshifted on M1
+        return true;
+    case SDL_SCANCODE_APOSTROPHE: return false;              // Ä
+
+    // The #/' key (left of ENTER on ISO boards).
+    case SDL_SCANCODE_NONUSHASH:
+    case SDL_SCANCODE_BACKSLASH:
+        if (shifted) { row=4; col=7; }                       // ' = M1 shift+7
+        else         { row=4; col=3; force_on=true; }        // # = M1 shift+3
+        return true;
+
+    // The </> ISO key next to the left shift.
+    case SDL_SCANCODE_NONUSBACKSLASH:
+        if (shifted) { row=5; col=6; }                       // > = M1 shift+.
+        else         { row=5; col=4; force_on=true; }        // < = M1 shift+,
+        return true;
+
+    case SDL_SCANCODE_COMMA:
+        if (shifted) { row=5; col=3; force_off=true; }       // ; unshifted on M1
+        else         { row=5; col=4; }
+        return true;
+    case SDL_SCANCODE_PERIOD:
+        if (shifted) { row=5; col=2; force_off=true; }       // : unshifted on M1
+        else         { row=5; col=6; }
+        return true;
+    case SDL_SCANCODE_SLASH:                                 // - / _
+        if (shifted) return false;                           // _ has no M1 key
+        row=5; col=5; return true;
+
+    // Letters (minus Y/Z above), controls, arrows: as in the US map.
+    default:
+        return map_key(shifted, scancode, row, col, force_on, force_off);
+    }
+}
+
 void EmuKeyboard::rebuild()
 {
     int numkeys = 0;
@@ -112,7 +199,10 @@ void EmuKeyboard::rebuild()
         if (!st[sc]) continue;
         int row, col;
         bool fon, foff;
-        if (!map_key(phys_shift, sc, row, col, fon, foff)) continue;
+        bool hit = (layout_ == Layout::DE)
+                   ? map_key_de(phys_shift, sc, row, col, fon, foff)
+                   : map_key(phys_shift, sc, row, col, fon, foff);
+        if (!hit) continue;
         mask |= uint64_t(1) << (row * 8 + col);
         any_on  |= fon;
         any_off |= foff;
