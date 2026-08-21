@@ -29,6 +29,9 @@ public:
 
     bool enabled() const { return dev_ != 0; }
 
+    // Mirror everything the speaker gets into a 44.1 kHz mono WAV.
+    bool dump_to(const std::string& path);
+
     // Call once per rising dot-clock edge with the ladder level
     // (m1_core.cass_out).
     void tick(uint8_t ladder);
@@ -50,6 +53,10 @@ private:
     uint64_t last_emu_  = 0;
     float    pace_      = 1.0f;
     float    trim_      = 1.0f;
+    bool     trim_on_   = false;
+
+    FILE*    dump_   = nullptr;
+    uint32_t dump_n_ = 0;
 
     float  x_prev_ = 0.0f;                 // DC-blocker state
     float  y_prev_ = 0.0f;

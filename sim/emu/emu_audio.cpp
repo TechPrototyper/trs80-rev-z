@@ -4,6 +4,7 @@
 
 #include <SDL.h>
 #include <cstdio>
+#include <cstring>
 #include <cstdlib>
 
 bool EmuAudio::init(int volume_percent)
@@ -39,6 +40,22 @@ EmuAudio::~EmuAudio()
 {
     if (dev_)
         SDL_CloseAudioDevice(dev_);
+    if (dump_) {
+        uint32_t dlen = dump_n_ * 2, flen = 36 + dlen, rate = 44100,
+                 brate = rate * 2;
+        uint8_t hdr[44] = {'R','I','F','F',0,0,0,0,'W','A','V','E',
+                           'f','m','t',' ',16,0,0,0, 1,0, 1,0,
+                           0,0,0,0, 0,0,0,0, 2,0, 16,0,
+                           'd','a','t','a',0,0,0,0};
+        memcpy(hdr + 4,  &flen, 4);
+        memcpy(hdr + 24, &rate, 4);
+        memcpy(hdr + 28, &brate, 4);
+        memcpy(hdr + 40, &dlen, 4);
+        fseek(dump_, 0, SEEK_SET);
+        fwrite(hdr, 1, 44, dump_);
+        fclose(dump_);
+        fprintf(stderr, "emu_audio: dumped %u samples\n", dump_n_);
+    }
 }
 
 // Ladder levels {~Q1, Q0}: OUT value 0 -> 2 (center), 1 -> 3 (high),
@@ -57,8 +74,33 @@ void EmuAudio::push(float s)
     buf_[buf_n_++] = s;
     if (buf_n_ == (int)(sizeof buf_ / sizeof buf_[0])) {
         SDL_QueueAudio(dev_, buf_, (Uint32)sizeof buf_);
+        if (dump_) {
+            for (int i = 0; i < buf_n_; i++) {
+                float v = buf_[i];
+                if (v > 1.0f)  v = 1.0f;
+                if (v < -1.0f) v = -1.0f;
+                int16_t q = (int16_t)(v * 32000.0f);
+                fwrite(&q, 2, 1, dump_);
+            }
+            dump_n_ += (uint32_t)buf_n_;
+        }
         buf_n_ = 0;
     }
+}
+
+// --sound-dump: everything the speaker gets, as a 44.1 kHz WAV — for
+// listening or measuring without a remote-desktop audio path in the
+// way. Header is finalized in the destructor.
+bool EmuAudio::dump_to(const std::string& path)
+{
+    dump_ = fopen(path.c_str(), "wb");
+    if (!dump_) {
+        fprintf(stderr, "emu_audio: cannot write %s\n", path.c_str());
+        return false;
+    }
+    uint8_t hdr[44] = {0};
+    fwrite(hdr, 1, 44, dump_);          // placeholder
+    return true;
 }
 
 void EmuAudio::tick(uint8_t ladder)
@@ -109,11 +151,23 @@ void EmuAudio::tick(uint8_t ladder)
             last_wall_ = now;
             last_emu_  = emu_us_;
 
+            // Trim with hysteresis: engage outside +/-40% of target,
+            // release inside +/-15%, and move at 0.4 per-mille per
+            // 1/8 s (~0.3%/s) — an order below audibility. The queue
+            // is allowed to breathe; only a sustained drift is chased.
             float queued = (float)(SDL_GetQueuedAudioSize(dev_)
                                    / sizeof(float));
             const float target = 8192.0f;
-            if      (queued > target * 1.4f) trim_ *= 1.0015f;
-            else if (queued < target * 0.6f) trim_ *= 0.9985f;
+            if (!trim_on_) {
+                if (queued > target * 1.4f || queued < target * 0.6f)
+                    trim_on_ = true;
+            } else if (queued < target * 1.15f
+                       && queued > target * 0.85f)
+                trim_on_ = false;
+            if (trim_on_) {
+                if (queued > target) trim_ *= 1.0004f;
+                else                 trim_ *= 0.9996f;
+            }
             if (trim_ < 0.85f) trim_ = 0.85f;
             if (trim_ > 1.20f) trim_ = 1.20f;
 

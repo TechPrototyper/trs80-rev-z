@@ -341,6 +341,7 @@ int main(int argc, char** argv)
     int         cas_baud = 500;
     bool        sound    = true;
     int         volume   = 60;
+    std::string sound_dump;
 
     for (int i = 1; i < argc; i++) {
         std::string a(argv[i]);
@@ -371,6 +372,7 @@ int main(int argc, char** argv)
         else if ((v = arg_value(a, "--cas-save=")) != "") { cas_save = v; }
         else if (a == "--no-sound") { sound = false; }
         else if ((v = arg_value(a, "--volume=")) != "") { volume = atoi(v.c_str()); }
+        else if ((v = arg_value(a, "--sound-dump=")) != "") { sound_dump = v; }
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
@@ -402,6 +404,8 @@ int main(int argc, char** argv)
     EmuAudio audio;
     if (sound)
         sound = audio.init(volume);
+    if (sound && !sound_dump.empty())
+        audio.dump_to(sound_dump);
     EmuKeyboard kbd;
     if (kbd_layout == "de") {
         kbd.set_layout(EmuKeyboard::Layout::DE);
