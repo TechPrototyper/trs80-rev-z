@@ -20,6 +20,7 @@ Requires: pyserial.
 import argparse
 import time
 import json
+import signal
 import socket
 import sys
 import threading
@@ -78,6 +79,7 @@ class TcpSerial:
 # binary protocol v0 (rtl/m1_debug.v)
 C_HALT, C_RUN, C_STEP, C_REGS, C_SETR = 0x01, 0x02, 0x03, 0x04, 0x05
 C_RDM, C_WRM, C_SBP, C_STAT, C_SWP = 0x06, 0x07, 0x08, 0x09, 0x0A
+C_KEYS = 0x0B
 R_ERR, R_EVT = 0xEE, 0x80
 
 REG_IDX = {"AF": 0, "BC": 1, "DE": 2, "HL": 3, "IX": 4, "IY": 5,
@@ -258,9 +260,44 @@ class Link:
         self._txn([C_SBP, slot, addr & 0xFF, addr >> 8, 1 if en else 0],
                   C_SBP, 0)
 
+    def set_wp(self, slot, addr, rw):
+        """rw bit0 = break on read, bit1 = break on write; 0 clears."""
+        addr &= 0xFFFF
+        self._txn([C_SWP, slot, addr & 0xFF, addr >> 8, rw & 3], C_SWP, 0)
+
     def status(self):
         t = self._txn([C_STAT], C_STAT, 4)
         return t[0], t[1], t[2] | (t[3] << 8)
+
+    def keys(self, matrix):
+        """KEYS: inject the 8-byte keyboard matrix (current report wins)."""
+        assert len(matrix) == 8
+        self._txn([C_KEYS] + list(matrix), C_KEYS, 0)
+
+    def probe_keys(self):
+        """Safe KEYS detection (DEBUG-PROTOCOL.md): 0B + 8x00. A backend
+        with KEYS answers a single 0B; a plain-v0 backend answers EE for
+        the 0B and one EE per trailing 00 — drain those and report False."""
+        with self.lock:
+            try:
+                self._ensure()
+                self.ser.write(bytes([C_KEYS] + [0] * 8))
+                while True:
+                    b = self._byte()
+                    if b == R_EVT:
+                        ev = [self._byte() for _ in range(3)]
+                        self.on_event(ev[0], ev[1] | (ev[2] << 8))
+                        continue
+                    break
+                if b == C_KEYS:
+                    return True
+                # R_ERR: old core; swallow the 8 EEs for the payload bytes
+                for _ in range(8):
+                    self._byte()
+                return False
+            except (OSError, serial.SerialException):
+                self._drop()
+                return False
 
 
 def hx(v, w=4):
@@ -270,12 +307,16 @@ def hx(v, w=4):
 class Bridge:
     TEMP_BP_SLOT = 7          # reserved for stepOver
     BP_SLOTS = range(0, 7)
+    WP_SLOTS = range(0, 4)
 
     def __init__(self, link):
         self.link = link
         self.sock = None
         self.running = False
         self.bps = []
+        self.wps = []
+        self.keys_supported = None    # probed lazily on first initialize
+        self.keys_active = False      # a non-zero debug matrix is armed
 
     # ---- notifications ----
     def on_event(self, cause, pc):
@@ -383,9 +424,16 @@ class Bridge:
     def handle(self, msg):
         m, p = msg.get("method"), msg.get("params") or {}
         if m == "initialize":
+            if self.keys_supported is None:
+                self.keys_supported = self.link.probe_keys()
             return {"programName": "trs80-rev-z debug bridge",
-                    "version": "0.1",
-                    "modelName": "TRS-80 Model I (FPGA)", "modelNumber": 1}
+                    "version": "0.2",
+                    "modelName": "TRS-80 Model I (FPGA)", "modelNumber": 1,
+                    # honest capabilities (ADR-0007 / DEBUG-PROTOCOL.md)
+                    "capabilities": {"setRegister": True, "stepOver": True,
+                                     "breakpoints": len(self.BP_SLOTS),
+                                     "watchpoints": len(self.WP_SLOTS),
+                                     "keys": self.keys_supported}}
         if m == "getRegisters":
             self.ensure_halted()
             return self.reg_object()
@@ -443,6 +491,29 @@ class Bridge:
                 else:
                     self.link.set_bp(slot, 0, False)
             return True
+        if m == "x-setWatchpoints":
+            wps = p.get("watchpoints", [])
+            if len(wps) > len(self.WP_SLOTS):
+                raise ValueError("too many watchpoints (4 hardware slots)")
+            rw_of = {"r": 1, "w": 2, "rw": 3}
+            self.wps = [(parse_num(wp["address"]) & 0xFFFF,
+                         rw_of[wp.get("access", "rw")]) for wp in wps]
+            for slot in self.WP_SLOTS:
+                if slot < len(self.wps):
+                    self.link.set_wp(slot, self.wps[slot][0],
+                                     self.wps[slot][1])
+                else:
+                    self.link.set_wp(slot, 0, 0)
+            return True
+        if m == "x-keys":
+            if not self.keys_supported:
+                raise LookupError("x-keys (backend has no KEYS)")
+            matrix = bytes.fromhex(p["matrix"])
+            if len(matrix) != 8:
+                raise ValueError("matrix must be 8 bytes (16 hex chars)")
+            self.link.keys(matrix)
+            self.keys_active = any(matrix)
+            return True
         if m == "launch":
             # the real emulator loads AND starts a .cmd natively; here the
             # bridge does the same against the machine. The client arms a
@@ -496,6 +567,7 @@ class Bridge:
         while True:
             self.sock, peer = srv.accept()
             print(f"bridge: debugger connected from {peer}")
+            self.attached = True
             buf = b""
             try:
                 while True:
@@ -521,6 +593,32 @@ class Bridge:
             finally:
                 print("bridge: debugger disconnected")
                 self.sock = None
+                self.detach()
+
+    def detach(self):
+        """The debugger is gone: leave the machine in a sane free-running
+        state (like an ICE being unplugged) — clear breakpoints and
+        watchpoints, release injected keys, resume if halted. Best effort;
+        a dead serial link must not take the server loop down."""
+        if not getattr(self, "attached", False):
+            return                        # already detached (idempotent)
+        self.attached = False
+        try:
+            self.running = False          # stop a wait_stop vigil
+            for slot in self.BP_SLOTS:
+                self.link.set_bp(slot, 0, False)
+            self.link.set_bp(self.TEMP_BP_SLOT, 0, False)
+            for slot in self.WP_SLOTS:
+                self.link.set_wp(slot, 0, 0)
+            self.bps = []
+            self.wps = []
+            if self.keys_active:
+                self.link.keys(bytes(8))
+                self.keys_active = False
+            if (self.link.status()[0] & 1):   # halted -> resume
+                self.link.run()
+        except Exception as ex:  # noqa: BLE001
+            print(f"bridge: detach cleanup skipped ({ex})")
 
 
 def main():
@@ -532,6 +630,9 @@ def main():
 
     bridge = Bridge(None)
     bridge.link = Link(args.serial, args.baud, bridge.on_event)
+    # SIGTERM (e.g. trszog stopping a bridge it spawned) -> SystemExit so
+    # the serve loop's finally still runs the detach cleanup.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     try:
         bridge.serve(args.port)
     except KeyboardInterrupt:
