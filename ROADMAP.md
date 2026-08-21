@@ -295,10 +295,18 @@ down so the direction is public — not because I know when, or whether, I'll ge
   SFTP preferred (the way a web server carries HTTPS), FTPS/FTP as the
   fallback; NFS rejected as too complex. Needs the SD-bus handover
   ESP32↔FPGA thought through first.
-- **Emulator quality-of-life.** The CRT bezel skin (grey monitor first,
-  the green three-knob revision later) and the push from ~0.75× to true
-  realtime for the cycle-true Verilator emulator (profiled: the model
-  eval itself dominates; see task notes).
+- **Emulator quality-of-life.** The CRT bezel skins are shipped (photo
+  bezels of both Video Display revisions); still open is the push from
+  ~0.75× to true realtime for the cycle-true Verilator emulator
+  (profiled: the model eval itself dominates; see task notes).
+- **A TRS-80 in a Codespace — zero installation.** A devcontainer in
+  this repo (and a trszog `.vsix` submitted to the VS Code Marketplace)
+  so that anyone can create a GitHub Codespace that *is* a TRS-80:
+  trszog pre-installed, the Kesteloot emulator target working out of
+  the box, and — ideally — the Verilator machine built in the container
+  as the "real hardware" target with its debug dongle attached. Open a
+  browser, get a cycle-true Model 1 with a full VS Code debugger, no
+  install. The demo story for the next Tandy Assembly talk.
 - **Virtual expansion-card bus.** The Model 1 edge connector as an internal, arbitrated
   bus with virtual "slots" — the Apple II/IBM-PC idea the TRS-80 never got, though the
   aftermarket built bus splitters that pointed exactly this way. Research on historical

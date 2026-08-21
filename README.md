@@ -91,20 +91,46 @@ make golden             # byte-exact VRAM diff against trs80gp (local install)
 make frames             # PNG frame dumps of the simulated screen
 ```
 
-**No board?** You can also run the machine interactively on your desktop
-using the Verilator-based SDL emulator in [`sim/emu/`](sim/emu/README.md):
+### No board? The RTL is its own emulator
+
+This may be the part of the project we are proudest of: the machine you
+put on the FPGA also runs, unchanged, as a **desktop TRS-80** — the same
+Verilog netlist, evaluated cycle by cycle on the single 10.6445 MHz dot
+clock by [Verilator](https://verilator.org), with thin C++ shims standing
+in for the board's peripherals (SDL window for the DVI stack, host files
+for the SD card, host audio for the DAC — the mapping table is in
+[`sim/emu/README.md`](sim/emu/README.md)). It is not an emulator *of* the
+Model 1 written next to the hardware; it is the hardware, simulated —
+every WD1771 gap byte, every cassette pulse, every video dot happens at
+the same clock edge it happens on silicon. NEWDOS/80 boots, double-sided
+disks mount, `SYSTEM` loads from a 500-baud cassette image, games sing
+through the cassette ladder, the drives seek audibly — and when something
+disagrees with a real Model 1 or with trs80gp, that is a bug we fix in
+the RTL, where it belongs.
 
 ```
-cd sim/emu && make
-./build/emu/Vm1_core --rom=/path/to/rom.hex --disk0=/path/to/newdos.dmk
+sim/emu/run.sh                              # boot to Level II BASIC
+sim/emu/run.sh newdos.dmk --skin=green      # boot a disk on the green tube
 ```
 
-An SDL2 window opens with the live TRS-80 display and keyboard input
-(glyph-faithful mapping, mirroring the board's USB-HID front end). The
-emulator can also script its own input (`--type='BASIC\n'`) and expose
-the debug core on a pseudo-tty (`--debug-pty`) — so DeZog debugs the
-simulated machine exactly like the physical board. See
-[`sim/emu/README.md`](sim/emu/README.md) for all options.
+| | |
+|---|---|
+| ![TRSDOS on the first-series Video Display](assets/emu_shot_grey.jpg) | ![TRSDOS on the later smoked-plate revision](assets/emu_shot_green.jpg) |
+
+*The simulated machine on photographic bezels of both real Video Display
+revisions (photos: Jason Scott CC BY 2.0 / Prolete CC0, see CREDITS.md) —
+CRT-curved picture, P4 white and P1 green phosphor, period drive sounds
+tuned against measured reference spectra, program sound from the cassette
+output ladder. `--kbd=de` for QWERTZ hosts, F12 is the RESET button.*
+
+To our knowledge nobody else runs a cycle-true FPGA recreation of the
+Model 1 whose unmodified RTL doubles as an interactive desktop emulator —
+with the same debug core serving VS Code on both targets (below). We
+think of it as a small case study in what an open toolchain
+(Verilator/yosys/nextpnr) makes possible: **one source of truth, three
+ways to run it** — testbench, desktop, silicon. See
+[`sim/emu/README.md`](sim/emu/README.md) for every option
+(`Vm1_core --help` prints a summary).
 
 With a [ULX3S-85F](boards/ulx3s/README.md#getting-a-board) (available via
 Crowd Supply, Mouser, or the makers' own shop — see the board README),
@@ -130,10 +156,12 @@ debug core's own binary wire protocol are documented in
 [docs/DEBUG-PROTOCOL.md](docs/DEBUG-PROTOCOL.md), so you can attach a
 different debugger, or drive the core directly. Today a reference bridge
 (`tools/trszog_bridge.py`) connects the two over the board's FTDI serial
-port — or over the desktop emulator's `--debug-pty`, which makes the
-simulated machine just another debug target; a first-class trszog remote
-type that starts the bridge for you is next (see
-[ADR-0007](docs/decisions/0007-trszog-integration.md)). The architecture,
+port — or over the desktop emulator's `--debug-tcp`, which makes the
+simulated machine just another debug target: breakpoint in the ROM,
+single-step the boot, watch the WD1771 registers — on the *simulated
+hardware*. A first-class trszog remote type (`revz`,
+[ADR-0007](docs/decisions/0007-trszog-integration.md)) that starts the
+bridge for you is being finished in trszog. The architecture,
 and the road to a dongle that debugs a *real* TRS-80 over a ribbon cable,
 is in [ADR-0006](docs/decisions/0006-debug-architecture.md).
 
