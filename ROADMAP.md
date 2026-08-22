@@ -8,7 +8,7 @@ reasoning is real, the specification is deliberately still open.
 
 ---
 
-## Where it stands (2026-07-29)
+## Where it stands (2026-08-22)
 
 The base system is functional: chapters 1–8 (the machine core) plus the Expansion
 Interface with the full FDC chain, all golden-verified, and the whole thing boots
@@ -19,10 +19,10 @@ pulled forward from the Vision tier because a machine you can hold, inspect,
 and single-step is the best test instrument for everything that follows, and, of course
 closes the loop to my original impulse: use a modern toolchain to develop and debug
 software on the TRS-80 as a first class citizen in VS Code.
-You actually can press F5 right in Visual Studio Code with your Z-80 Aseembly Language
+You actually can press F5 right in Visual Studio Code with your Z-80 Assembly Language
 source code on your screen and single-step on the real hardware using the TRS-80 Rev Z,
 your ULX3S-85F FPGA board and the finest Z-80 Debugger available for your
-VS Code Environment, the TRS-80 edition of maziac's [DeZog](https://github.com/TechPrototyper/trszog)
+VS Code Environment, the TRS-80 edition of maziac's [DeZog](https://github.com/TechPrototyper/trszog).
 How cool is that!!!!!
 
 Everything above is re-runnable: `cd sim && make` for the testbenches, the

@@ -2,7 +2,7 @@
 
 **Status: normative spec, tracks ADR-0006 / ADR-0007.** 
 
-This specification is a ** **debugger-agnostic interface** to the 
+This specification is a **debugger-agnostic interface** to the
 TRS-80 rev-z debug core / dongle.
 
 trszog uses this interface to interact with the TRS-80, but it is
@@ -33,7 +33,7 @@ You can implement against **either** layer:
   the ESP32 server *exposes* to a debugger. Target this to plug in a
   different debugger while reusing our bridge. It is the compatibility
   surface a debug-enabled trs80gp also might speak, so one debugger could then
-  drive the integrated siumlator, the goldstandard emulator, this FPGA machine, 
+  drive the integrated simulator, the gold-standard emulator, this FPGA machine,
   or a real TRS-80 behind a dongle, interchangeably.
 
 The reference bridge translates Layer 2 ⇄ Layer 1; the ESP32 server will

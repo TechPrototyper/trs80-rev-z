@@ -32,7 +32,10 @@ The machine is real: it boots TRSDOS 2.3 and NEWDOS/80 from SD card to
 and double-sided DMK disks, video snow included. The cassette is real too:
 Space Invaders loads from a 500-baud WAV via `SYSTEM`, and `CSAVE`/`CLOAD`
 round-trip byte-exact — read and write timing pinned against trs80gp. On top
-sits a debug core that halts and single-steps the live Z80 from VS Code. And
+sits a debug core that halts and single-steps the live Z80 from VS Code —
+which since the trszog `revz` remote also shows the machine's screen as a
+live panel and types into its keyboard, with memory reads that steal zero
+CPU cycles (a second BRAM port, not an ICE trick). And
 if you have no board, the same RTL runs as an interactive desktop emulator
 under Verilator ([`sim/emu/`](sim/emu/README.md)) — same machine, same disks,
 same tapes, same debugger.
@@ -159,9 +162,16 @@ different debugger, or drive the core directly. Today a reference bridge
 port — or over the desktop emulator's `--debug-tcp`, which makes the
 simulated machine just another debug target: breakpoint in the ROM,
 single-step the boot, watch the WD1771 registers — on the *simulated
-hardware*. A first-class trszog remote type (`revz`,
-[ADR-0007](docs/decisions/0007-trszog-integration.md)) that starts the
-bridge for you is being finished in trszog. The architecture,
+hardware*. The first-class trszog remote type (`revz`,
+[ADR-0007](docs/decisions/0007-trszog-integration.md) — accepted and
+implemented) starts the bridge for you, shows the machine's screen as a
+live panel inside VS Code (VRAM polled over the debug link, rendered by
+Lawrence Kesteloot's TRS-80 screen renderer) and forwards your keyboard
+to the machine — so with the emulator running `--hidden`, the whole
+TRS-80 lives inside the editor. On cores that support it, memory reads
+under RUN go through a dedicated second BRAM port and cost the CPU
+nothing; on targets without it (a real TRS-80 behind the dongle) the
+bridge falls back to the classic halt/peek/run automatically. The architecture,
 and the road to a dongle that debugs a *real* TRS-80 over a ribbon cable,
 is in [ADR-0006](docs/decisions/0006-debug-architecture.md).
 

@@ -22,10 +22,11 @@ Status 2026-07 — availability moves, the links don't:
 - **[Lectronz](https://lectronz.com/products/ulx3s-85f-v3-1-8)** — the makers'
   direct EU shop (Intergalaktik, Zagreb); restock notifications available.
 
-On the smaller ECP5 variants: the current design uses ≈15 k LUTs and ≈50 of
-208 block RAMs — the 45F would probably carry it, the 12F would not. The
-committed target, and the only tested one, is the 85F; the headroom is
-reserved for the Vision tier.
+On the smaller ECP5 variants: the current design uses ≈15 k LUTs and 81 of
+208 block RAMs (the debug core's non-intrusive memory path adds second BRAM
+read ports — see DEBUG-PROTOCOL.md) — the 45F would carry it at ~75 % BRAM,
+the 12F would not. The committed target, and the only tested one, is the
+85F; the headroom is reserved for the Vision tier.
 
 ## Build & flash
 
