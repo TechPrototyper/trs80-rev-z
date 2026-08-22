@@ -39,7 +39,22 @@ sounds that need them), then the **Z-Bus** — the virtual card bus with
 the physical 40-pin bridge, the project's next big milestone. RS-232-C
 (M5) and Centronics (M6) queue behind those.
 
-Recently closed: M2 (Cassette) on 2026-08-21 — read/write paths
+Recently closed: the **trszog integration sweep** on 2026-08-22 —
+ADR-0007 delivered end to end. trszog's `revz` remote is a first-class
+citizen (honest capabilities from `initialize`, hardware watchpoints as
+WPMEM, polite bridge lifecycle), VS Code shows the machine's **screen as
+a live panel** (VRAM polling over the debug link, Kesteloot renderer)
+with a working **keyboard** (new KEYS command, HID-report semantics,
+safely probeable on old cores), and READ_MEM grew an optional
+**non-intrusive path** over second BRAM ports — reads under RUN steal
+zero CPU cycles, so NEWDOS boots and serves DIR under ~680 VRAM polls/s
+with the FDC untouched; on a real TRS-80 behind the dongle the classic
+halt/peek/run stays the honest baseline, chosen automatically per
+capability. Costs 81/208 DP16KD on the 85F (would fit a 45F at 75%).
+All of it spec-first in DEBUG-PROTOCOL.md, golden through tb_m1_debug
+and live sessions against the Verilator machine.
+
+Before that: M2 (Cassette) on 2026-08-21 — read/write paths
 golden-pinned against trs80gp, CSAVE/CLOAD round trip byte-exact
 through WAV, Space Invaders loading from the assembly corpus via
 `SYSTEM`, SD deck (`TRS80/CASSETTE/`, `CASSOUT.CAS`)

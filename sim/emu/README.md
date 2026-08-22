@@ -107,26 +107,41 @@ recordings when the app is installed. Environment overrides: `TRS80_ROM`,
 `TRS80_SKIN`, `TRS80_KBD` (QWERTZ users: `de`), `TRS80_THROTTLE`.
 `Vm1_core --help` prints the full option summary.
 
-## Debugging with DeZog (`--debug-pty`)
+## Debugging with DeZog (`--debug-tcp` / `--debug-pty`)
 
 The emulator build includes the full debug core (`m1_debug`, ADR-0006).
-With `--debug-pty` its binary-v0 byte stream is exposed on a pseudo-tty —
-the emulator-side stand-in for the board's FTDI serial port. The slave
-path is printed at startup:
+`--debug-tcp=<port>` exposes its binary-v0 byte stream on a localhost TCP
+listener (the robust choice — see the macOS pty note in the option
+table); `--debug-pty` puts the same stream on a pseudo-tty, the
+emulator-side stand-in for the board's FTDI serial port.
+
+The full loop with trszog's `revz` remote (ADR-0007):
 
 ```
-emu_debug: binary-v0 debug link on /dev/ttys012
+sim/emu/run.sh --hidden --volume=0 --debug-tcp=5555
 ```
 
-Point the unchanged reference bridge at it:
+launch.json (trszog starts the bridge for you):
 
-```
-python3 tools/trszog_bridge.py --serial /dev/ttys012
+```jsonc
+"remoteType": "revz",
+"revz": {
+    "transport": {
+        "kind": "python",
+        "serial": "tcp:5555",       // or the pty path / the board's FTDI device
+        "bridge": "/path/to/trs80-rev-z/tools/trszog_bridge.py",
+        "autoStart": true
+    }
+}
 ```
 
-and attach DeZog/trszog exactly as for the physical board (ADR-0007's
-`revz` remote; the baud rate is meaningless on a pty). Same protocol,
-same bridge, same launch.json — only the device path differs.
+Same protocol, same bridge, same launch.json as the physical board —
+only the `serial` value differs. On top of the debugger basics the
+session gets a live **screen view** in VS Code (the panel polls the text
+VRAM; with this emulator's non-intrusive reads the polling costs the
+machine zero CPU cycles) and a **keyboard**: typing into the panel
+injects the matrix via the KEYS command. Games are fully playable in
+the panel while the SDL window runs `--hidden`.
 
 ## Keyboard mapping
 
