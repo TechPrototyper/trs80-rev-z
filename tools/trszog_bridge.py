@@ -93,6 +93,12 @@ CALL_OPCODES = {0xCD, 0xC4, 0xCC, 0xD4, 0xDC, 0xE4, 0xEC, 0xF4, 0xFC}
 RST_OPCODES = {0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF}
 
 
+class CoreRefused(Exception):
+    """The core answered EE: a healthy link saying 'no' (bad index, or a
+    memory command the current state does not allow). Deliberately not an
+    OSError — the link is fine and must not be reopened."""
+
+
 def parse_num(v):
     """Accept JSON numbers and hex strings, with or without 0x."""
     if isinstance(v, int):
@@ -163,7 +169,7 @@ class Link:
                 self.on_event(ev[0], ev[1] | (ev[2] << 8))
                 continue
             if b == R_ERR:
-                raise IOError("debug core refused the command")
+                raise CoreRefused("debug core refused the command")
             if b != first_ok:
                 raise IOError(f"framing: expected {first_ok:02x}, got {b:02x}")
             return bytes(self._byte() for _ in range(tail_len))
@@ -209,6 +215,8 @@ class Link:
                 self._ensure()
                 self.ser.write(bytes(frame))
                 return self._resp(first_ok, tail_len)
+            except CoreRefused:
+                raise                          # healthy link, keep it open
             except (OSError, serial.SerialException) as e:
                 self._drop()
                 raise IOError(f"serial link lost ({e}); "
@@ -317,6 +325,10 @@ class Bridge:
         self.wps = []
         self.keys_supported = None    # probed lazily on first initialize
         self.keys_active = False      # a non-zero debug matrix is armed
+        self.ni_supported = None      # non-intrusive READ_MEM: probed on
+                                      # first initialize (only meaningful
+                                      # while running), else adapted on
+                                      # the first read-under-run
 
     # ---- notifications ----
     def on_event(self, cause, pc):
@@ -426,14 +438,27 @@ class Bridge:
         if m == "initialize":
             if self.keys_supported is None:
                 self.keys_supported = self.link.probe_keys()
+            if self.ni_supported is None:
+                # the probe (DEBUG-PROTOCOL.md) only distinguishes cores
+                # while the machine runs; attached to a halted machine it
+                # stays undetermined and the first read-under-run decides
+                if not (self.link.status()[0] & 1):
+                    try:
+                        self.link.read_mem(0, 1)
+                        self.ni_supported = True
+                    except CoreRefused:
+                        self.ni_supported = False
+            caps = {"setRegister": True, "stepOver": True,
+                    "breakpoints": len(self.BP_SLOTS),
+                    "watchpoints": len(self.WP_SLOTS),
+                    "keys": self.keys_supported}
+            if self.ni_supported is not None:
+                caps["nonIntrusiveReadMemory"] = self.ni_supported
             return {"programName": "trs80-rev-z debug bridge",
-                    "version": "0.2",
+                    "version": "0.3",
                     "modelName": "TRS-80 Model I (FPGA)", "modelNumber": 1,
                     # honest capabilities (ADR-0007 / DEBUG-PROTOCOL.md)
-                    "capabilities": {"setRegister": True, "stepOver": True,
-                                     "breakpoints": len(self.BP_SLOTS),
-                                     "watchpoints": len(self.WP_SLOTS),
-                                     "keys": self.keys_supported}}
+                    "capabilities": caps}
         if m == "getRegisters":
             self.ensure_halted()
             return self.reg_object()
@@ -447,9 +472,19 @@ class Bridge:
         if m == "readMemory":
             addr = parse_num(p["address"])
             n = parse_num(p.get("length", p.get("size", 1)))
+            if self.ni_supported is not False:
+                # capable core (or not probed yet): READ_MEM just works —
+                # non-intrusively under run, via the bus master under halt
+                try:
+                    data = self.link.read_mem(addr, n)
+                    return {"address": f"0x{addr:04x}", "size": n,
+                            "data": data.hex()}
+                except CoreRefused:
+                    self.ni_supported = False  # baseline core: fall through
+            # baseline: transparent halt/peek/run (the ICE way)
             was_running = self.ensure_halted()
             data = self.link.read_mem(addr, n)
-            if was_running:                    # transparent peek: resume
+            if was_running:
                 self.link.run()
                 self.running = True
             return {"address": f"0x{addr:04x}", "size": n,
