@@ -75,9 +75,31 @@ the ESP32 link tomorrow.
   break on write (address comparators on the CPU's data strobes).
 - **STATUS flags:** bit0 = halted, bit1 = target-reset-seen (sticky,
   **cleared by reading STATUS**). `cause` is the last stop cause (below).
-- **Memory** commands work only while halted; issued while running they
-  return the error byte. `n` is a 16-bit count — the reference bridge
-  chunks a whole-bank read into ≤ 32 KiB transactions.
+- **Memory** commands work while halted; `n` is a 16-bit count — the
+  reference bridge chunks a whole-bank read into ≤ 32 KiB transactions.
+  Issued while running, WRITE_MEM always returns the error byte; for
+  READ_MEM the behavior depends on the core:
+  - **Baseline** (v0 as originally shipped, and any core on a real TRS-80
+    behind the dongle, where the memory is on the machine's bus): error
+    byte. Hosts fall back to halt/peek/run — the ICE way.
+  - **Non-intrusive read** (optional; cores whose memory is FPGA block
+    RAM — the Rev Z machine and its Verilator twin): READ_MEM answers
+    normally while the machine runs, served from second BRAM read ports.
+    Zero CPU cycles are stolen; the running program cannot tell. The
+    served picture is the *memory*, not the bus: ROM, RAM, EI RAM (an
+    unpopulated bank reads 0xFF) and video RAM (with its authentic bit-6
+    read fold) return their contents, the keyboard matrix region
+    (0x3800–0x3BFF) returns the live rows, and the memory-mapped device
+    region (0x3000–0x37FF) reads 0xFF — device registers are **not**
+    touched, so no read side effects can fire behind the program's back.
+    Under halt, READ_MEM keeps using the authentic bus-master path
+    (device side effects included) on all cores, unchanged.
+  - **Detection** is a side-effect-free probe: send a 1-byte READ_MEM
+    while the machine runs — a baseline core answers `EE`, a capable one
+    answers data. The reference bridge probes once per session (skipped
+    when it attaches to a halted machine; it then adapts on the first
+    read-under-run) and surfaces the result as the
+    `nonIntrusiveReadMemory` capability (Layer 2, `initialize`).
 - **KEYS:** injects keyboard input. The 8 payload bytes are the TRS-80
   keyboard matrix, byte *k* = row *k*, bit *j* = column *j*, 1 = pressed
   (row 0 `@ A…G`, row 1 `H…O`, row 2 `P…W`, row 3 `X Y Z`, row 4 `0…7`,
@@ -187,9 +209,10 @@ clients keep working. Keys defined so far:
 | `breakpoints` | number | hardware PC-breakpoint slots (7 usable; slot 8 is the stepOver temp) |
 | `watchpoints` | number | hardware data-watchpoint slots (0 = none, see `x-setWatchpoints`) |
 | `keys` | bool | keyboard injection via `x-keys` (Layer 1 KEYS probed at session start) |
+| `nonIntrusiveReadMemory` | bool | READ_MEM works while running, zero CPU impact (second BRAM ports). Absent when not yet probed (session attached to a halted machine); the bridge adapts either way, so clients need it for display only |
 
 The reference bridge reports
-`{"setRegister": true, "stepOver": true, "breakpoints": 7, "watchpoints": 4, "keys": <probed>}`.
+`{"setRegister": true, "stepOver": true, "breakpoints": 7, "watchpoints": 4, "keys": <probed>, "nonIntrusiveReadMemory": <probed>}`.
 
 ### Extension methods (`x-…`)
 
@@ -272,6 +295,9 @@ as new ones:
 
 - **Non-intrusive memory access:** `readMemory` under run uses a second
   BRAM port — no CPU stall, no bus steal; the running program cannot tell.
+  (Implemented — see READ_MEM above and the `nonIntrusiveReadMemory`
+  capability; on a real TRS-80 behind the dongle the baseline
+  halt/peek/run remains, honestly reported.)
 - **True hardware breakpoints/watchpoints:** address comparators on the
   fetch/read/write strobes — no code patching, works in ROM, any address.
 - **Cycle-exact stepping:** the machine's clock-enable seam (`cpu_cen`)
