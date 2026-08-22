@@ -21,9 +21,7 @@ tries a specific combination: the Model 1 the way Tandy shipped it (**Goldstanda
 Rev G, Level II BASIC 1.3, 48 KB, expansion interface, with all its quirks *including*
 the snow), and, switchable, the revision Tandy never got around to (**Rev Z**: sensible
 fixes and period-plausible extensions, each individually selectable, always reversible
-to bit-exact stock behavior). Verification is not "looks right on screen" but byte-exact
-comparison against golden models, predominantly George Phillips' trs80gp emulator, 
-simulation before silicon.
+to bit-exact stock behavior). Verification is byte-exact comparison against golden models, predominantly George Phillips' trs80gp emulator, simulation before silicon.
 
 ## Why the open toolchain is a force multiplier
 
