@@ -25,6 +25,23 @@ to bit-exact stock behavior). Verification is not "looks right on screen" but by
 comparison against golden models, predominantly George Phillips' trs80gp emulator, 
 simulation before silicon.
 
+## Why the open toolchain is a force multiplier
+
+Using a fully open FPGA toolchain (yosys, nextpnr-ecp5, prjtrellis, Verilator) is not
+just a licensing preference — it is a technical multiplier.
+
+First, it keeps the hardware description portable: as open flows mature and support more
+targets, the same machine can be retargeted to additional FPGA families instead of being
+locked to one vendor stack.
+
+Second, Verilator turns the exact same RTL into a cycle-accurate local machine process:
+the digital hardware runs as software (or in a container) on your workstation, clocked
+dot-cycle by dot-cycle. That means one source of truth across three execution modes:
+testbench, desktop runtime, and physical FPGA.
+
+In practice this project treats that as a core design principle: when behavior differs,
+we fix the RTL once and validate it in simulation and on silicon.
+
 ## Where it stands
 
 The machine is real: it boots TRSDOS 2.3 and NEWDOS/80 from SD card to
@@ -76,9 +93,9 @@ here is a story for another time and place.
 
 | Tier | Contents |
 |---|---|
-| **Committed, built and golden-verified** | Rev G mainboard · Level II 1.3 · 48 KB · video incl. snow · expansion interface · WD1771/1791 dual-controller FDC with **mixed-density** and **double-sided** disk support (DMK) · cassette (M2: 500-baud read/write, `.cas`+WAV, SD deck) · debug core with VS-Code integration · desktop emulator — all byte-exact against trs80gp |
+| **Committed, built and golden-verified** | Rev G mainboard · Level II 1.3 · 48 KB · video incl. snow · expansion interface · WD1771/1791 dual-controller FDC with **mixed-density** and **double-sided** DMK support · cassette read/write at measured timing · debug core with break/watchpoints · VS Code integration via trszog `revz` remote · Verilator desktop emulator (`sim/emu`) with same RTL |
 | **Committed, next up** | ULX3S hardware smoke test · companion UI · Z-Bus — then RS-232-C (M5) · Centronics (M6) |
-| **Vision** (direction, deliberately open) | ESP32 companion (untethered debug server, disk sources, telemetry, drive sound) · virtual expansion-card bus · TRS-IO/FreHD · PCG-80 · raster interrupt · CP/M (Omikron mapper + 64 KB Rev-Z board) · enclosure |
+| **Vision** (direction, deliberately open) | ESP32 companion (untethered debug server, disk sources, telemetry, drive sound) · virtual expansion-card bus · TRS-IO/FreHD · PCG-80 · raster interrupts |
 
 Details and reasoning in [ROADMAP.md](ROADMAP.md). What belongs in Rev Z is a standing
 discussion — I'd genuinely like to hear what *your* "revision Tandy never built" would
@@ -141,7 +158,7 @@ Crowd Supply, Mouser, or the makers' own shop — see the board README),
 HDMI out, USB keyboard, ROM and disk images from SD card, TRSDOS boot.
 
 ![ULX3S FPGA Board Annotated Diagram](assets/ulx3s_diagram.jpg)<br/>
-*The ULX3S FPGA Board — designed by Radiona.org / Goran Mahovlić / Intergalaktik (Lattice ECP5 85F, 32 MB SDRAM, GPDI HDMI out, Micro-SD, FTDI USB debugging, ESP32 slot). Diagram/Photo: Radiona / Intergalaktik / Crowd Supply (Open Hardware).*
+*The ULX3S FPGA Board — designed by Radiona.org / Goran Mahovlić / Intergalaktik (Lattice ECP5 85F, 32 MB SDRAM, GPDI HDMI out, Micro-SD, FTDI USB debugging, ESP32 slot). Diagram/Photo: Radiona / Intergalaktik / Crowd Supply (Open Hardware), details in CREDITS.md.*
 
 Play with it. Boot your disks, run your old programs, try to break it —
 a report that something behaves differently from a real Model 1 (or from
