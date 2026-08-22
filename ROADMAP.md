@@ -297,10 +297,6 @@ off to the bit-exact stock machine.
 Each of these follows the Rev-Z rule: off = bit-exact stock machine. They're written
 down so the direction is public — not because I know when, or whether, I'll get there.
 
-
-- **Audio.** Floppy Drive seek/spindle and keyboard sounds, each with on/off toggles —
- the machine you *hear*. Plus the cassette ladder on the ULX3S audio DAC:
- record a REAL tape from the FPGA (or feed a real Model 1), 1978-style.
 - **Companion UI (ESP32, ADR-0008).** The microcontroller as the machine's
   front desk: settings (expansions on/off, ROM selection), inserting and
   ejecting disks/tapes at runtime, sound options. The SDL emulator will
@@ -317,7 +313,7 @@ down so the direction is public — not because I know when, or whether, I'll ge
 - **A TRS-80 in a Codespace — zero installation.** A devcontainer in
   this repo (and a trszog `.vsix` submitted to the VS Code Marketplace)
   so that anyone can create a GitHub Codespace that *is* a TRS-80:
-  trszog pre-installed, the Kesteloot emulator target working out of
+  trszog pre-installed, Lawrence Kesteloot's emulator target working out of
   the box, and — ideally — the Verilator machine built in the container
   as the "real hardware" target with its debug dongle attached. Open a
   browser, get a cycle-true Model 1 with a full VS Code debugger, no
@@ -348,7 +344,7 @@ down so the direction is public — not because I know when, or whether, I'll ge
   the Model 1/III/4 that rides the RS-232 port address space. Deferred —
   needs first-hand evaluation (already available in trs80gp) before any
   commitment; likely needs no dedicated hardware work once RS-232-C (M5)
-  exists, since it is "just" another RS-232 peripheral.
+  exists.
 - **Enclosure.** A Model-1-styled case for the ULX3S. Last, and with love. Inspired by
   [RetroStack](https://github.com/RetroStack/).
 
