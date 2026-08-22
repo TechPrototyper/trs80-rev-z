@@ -29,6 +29,12 @@ module m1_rom (
     output wire [7:0]  dout,
     output wire        dout_en,
 
+    // debug read port (DEBUG-PROTOCOL.md, non-intrusive READ_MEM): the
+    // DP16KD's second port — reads run in parallel with the CPU and
+    // steal nothing. Registered like the main read (1-clock latency).
+    input  wire [13:0] a2,
+    output reg  [7:0]  dout2,
+
     // loader port (board: SD/ESP32; sim: testbench)
     input  wire        ld_en,
     input  wire [13:0] ld_addr,
@@ -50,6 +56,9 @@ module m1_rom (
     reg [7:0] rdata;
     always @(posedge clk)
         rdata <= mem[a];
+
+    always @(posedge clk)
+        dout2 <= mem[a2];
 
     assign dout    = rdata;
     assign dout_en = (~roma_n | ~romb_n) & ~mem_n;

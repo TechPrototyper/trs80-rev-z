@@ -31,7 +31,13 @@ module m1_ei_ram (
     input  wire [1:0]  cfg,     // population: 00 none, 01 16K, 1x 32K
     input  wire [7:0]  din,     // data bus (unbuffered into the DRAM DIN)
     output wire [7:0]  dout,
-    output wire        dout_en
+    output wire        dout_en,
+
+    // debug read port (non-intrusive READ_MEM): second DP16KD port,
+    // registered. Population gating happens in the parent — this is the
+    // raw array (an unpopulated bank is folded to 0xFF there).
+    input  wire [14:0] a2,
+    output reg  [7:0]  dout2
 );
 
     // bank selects: A15=1 memory cycle, split on A14
@@ -48,6 +54,9 @@ module m1_ei_ram (
     reg [7:0] rdata;
     always @(posedge clk)
         rdata <= mem[a];
+
+    always @(posedge clk)
+        dout2 <= mem[a2];
 
     assign dout    = rdata;
     assign dout_en = populated & ~rd_n;

@@ -31,7 +31,12 @@ module m1_ram (
     input  wire        mem_n,  // MEM*: read buffers Z67/Z68
     input  wire [7:0]  din,    // data bus (unbuffered into the 4116 DIN pins)
     output wire [7:0]  dout,
-    output wire        dout_en
+    output wire        dout_en,
+
+    // debug read port (non-intrusive READ_MEM): second DP16KD port,
+    // registered — parallel to the CPU, steals nothing
+    input  wire [13:0] a2,
+    output reg  [7:0]  dout2
 );
 
     reg [7:0] mem [0:16383];
@@ -43,6 +48,9 @@ module m1_ram (
     reg [7:0] rdata;
     always @(posedge clk)
         rdata <= mem[a];
+
+    always @(posedge clk)
+        dout2 <= mem[a2];
 
     assign dout    = rdata;
     assign dout_en = ~ram_n & ~mem_n;

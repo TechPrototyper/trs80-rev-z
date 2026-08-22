@@ -73,7 +73,14 @@ module m1_vram (
 
     // video side (to m1_video_gen)
     output wire [5:0] vd,       // VD0..VD5
-    output wire       vd7       // VD7 (Z63, graphic/alpha flag)
+    output wire       vd7,      // VD7 (Z63, graphic/alpha flag)
+
+    // debug read port (non-intrusive READ_MEM): a third reader of the
+    // seven RAMs, registered, with the same Z30-unit-4 bit-6
+    // reconstruction the CPU sees — a debug peek reads exactly what a
+    // PEEK would, without ever touching the CPU/chain mux
+    input  wire [9:0] a2,
+    output wire [7:0] dout2
 );
 
     // ------------------------------------------------------------------
@@ -109,5 +116,10 @@ module m1_vram (
 
     assign dout_en = ~vrd_n;
     assign dout    = {q[6], vd6, q[5:0]};
+
+    reg [6:0] q2;
+    always @(posedge clk)
+        q2 <= ram[a2];
+    assign dout2 = {q2[6], ~(q2[5] | q2[6]), q2[5:0]};
 
 endmodule

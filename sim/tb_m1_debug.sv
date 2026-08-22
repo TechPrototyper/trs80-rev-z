@@ -207,9 +207,37 @@ module tb_m1_debug;
         end
         recv(b); recv(b); recv(b);
 
-        // ---- memory access while running must refuse ----
-        send(8'h06); send(8'h00); send(8'h00); send(8'h01); send(8'h00);
-        expect_byte(8'hEE, "READ_MEM refused while running");
+        // ---- READ_MEM while running: served NON-INTRUSIVELY from the
+        //      memories' second BRAM ports (DEBUG-PROTOCOL.md) — correct
+        //      data from every region, and the CPU keeps running ----
+        snap = cen_pulses;
+        rd_mem(16'h0010, 16'd24);              // ROM == the loaded image
+        for (i = 0; i < 24; i++) begin
+            recv(b);
+            if (b !== image[32'h0010 + i]) begin
+                $display("FAIL  ni ROM[%04h] read %02h, image %02h",
+                         32'h0010 + i, b, image[32'h0010 + i]);
+                errors++;
+            end
+        end
+        rd_mem(16'h4100, 16'd1);               // the program's own write
+        expect_byte(8'h55, "ni RAM[4100] while running");
+        rd_mem(16'h3C00, 16'd1);               // unwritten VRAM: bit-6 fold
+        expect_byte(8'h40, "ni VRAM[3C00] while running");
+        rd_mem(16'h3801, 16'd1);               // keyboard row, no keys down
+        expect_byte(8'h00, "ni keyboard row while running");
+        rd_mem(16'h8000, 16'd1);               // EI bank unpopulated (cfg 00)
+        expect_byte(8'hFF, "ni EI RAM (unpopulated) while running");
+        rd_mem(16'h3700, 16'd1);               // device window: never touched
+        expect_byte(8'hFF, "ni device window while running");
+        if (cen_pulses == snap) begin
+            $display("FAIL  CPU stalled during non-intrusive reads");
+            errors++;
+        end
+
+        // ---- WRITE_MEM while running still refuses ----
+        send(8'h07); send(8'h00); send(8'h41); send(8'h01); send(8'h00);
+        expect_byte(8'hEE, "WRITE_MEM refused while running");
 
         // ---- HALT: freeze at a boundary, cen goes silent ----
         do_halt(pc);

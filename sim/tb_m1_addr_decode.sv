@@ -41,7 +41,8 @@ module tb_m1_addr_decode;
         .col(6'd0), .row(4'd0),
         .vid_n(vid_n), .rd_n(rd_n), .wr_n(wr_n),
         .a(addr[9:0]), .din(cpu_d[5:0]), .din7(cpu_d[7]),
-        .dout(dout), .dout_en(dout_en), .vd(), .vd7()
+        .dout(dout), .dout_en(dout_en), .vd(), .vd7(),
+        .a2(10'd0), .dout2()    // debug read port: unused in this bench
     );
     /* verilator lint_on PINCONNECTEMPTY */
 

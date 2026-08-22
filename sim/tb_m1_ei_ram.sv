@@ -32,7 +32,12 @@ module tb_m1_ei_ram;
     m1_ei_ram dut (
         .clk(clk), .a(a), .a15(a15),
         .ras_n(ras_n), .rd_n(rd_n), .wr_n(wr_n),
-        .cfg(cfg), .din(din), .dout(dout), .dout_en(dout_en)
+        .cfg(cfg), .din(din), .dout(dout), .dout_en(dout_en),
+        // debug read port: unused in this bench
+        .a2(15'd0),
+        /* verilator lint_off PINCONNECTEMPTY */
+        .dout2()
+        /* verilator lint_on PINCONNECTEMPTY */
     );
 
     task automatic idle_bus();

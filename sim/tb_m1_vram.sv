@@ -59,7 +59,12 @@ module tb_m1_vram;
         .vid_n(vid_n), .rd_n(rd_n), .wr_n(wr_n),
         .a(cpu_a), .din(cpu_d[5:0]), .din7(cpu_d[7]),
         .dout(dout), .dout_en(dout_en),
-        .vd(vd), .vd7(vd7)
+        .vd(vd), .vd7(vd7),
+        // debug read port: unused in this bench
+        .a2(10'd0),
+        /* verilator lint_off PINCONNECTEMPTY */
+        .dout2()
+        /* verilator lint_on PINCONNECTEMPTY */
     );
 
     m1_video_gen u_vg (

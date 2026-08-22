@@ -159,6 +159,8 @@ module m1_core #(
     wire [7:0]  dbg_wdata;
     wire        dbg_rd_n, dbg_wr_n;
     wire [7:0]  dbg_feed;
+    wire [15:0] dbg_ni_addr;
+    wire [7:0]  dbg_ni_rdata;
 
     m1_debug u_dbg (
         .clk(clk), .rst_n(dbg_rst_n), .tgt_rst_n(por_rst_n),
@@ -172,7 +174,8 @@ module m1_core #(
         .cpu_m1_n(m1_n), .cpu_inte(cpu_inte),
         .freeze(dbg_freeze), .stuff(dbg_stuff), .feed(dbg_feed),
         .master(dbg_master), .mst_addr(dbg_addr), .mst_wdata(dbg_wdata),
-        .mst_rd_n(dbg_rd_n), .mst_wr_n(dbg_wr_n)
+        .mst_rd_n(dbg_rd_n), .mst_wr_n(dbg_wr_n),
+        .ni_addr(dbg_ni_addr), .ni_rdata(dbg_ni_rdata)
     );
 
     // the fabric the decoder and memories see: the CPU, or — frozen — the
@@ -196,26 +199,31 @@ module m1_core #(
     // ---- ROM / RAM ----
     wire [7:0] rom_dout, ram_dout;
     wire       rom_en, ram_en;
+    wire [7:0] rom_ni, ram_ni;
     m1_rom u_rom (
         .clk(clk), .a(f_addr[13:0]),
         .roma_n(roma_n), .romb_n(romb_n), .mem_n(mem_n),
         .dout(rom_dout), .dout_en(rom_en),
+        .a2(dbg_ni_addr[13:0]), .dout2(rom_ni),
         .ld_en(ld_en), .ld_addr(ld_addr), .ld_data(ld_data)
     );
     m1_ram u_ram (
         .clk(clk), .a(f_addr[13:0]),
         .ram_n(ram_n), .wr_n(f_wr_n), .mem_n(mem_n),
-        .din(bus), .dout(ram_dout), .dout_en(ram_en)
+        .din(bus), .dout(ram_dout), .dout_en(ram_en),
+        .a2(dbg_ni_addr[13:0]), .dout2(ram_ni)
     );
 
     // ---- Expansion Interface RAM (upper 32K, ADR-0005) ----
     wire [7:0] ei_ram_dout;
     wire       ei_ram_en;
+    wire [7:0] ei_ram_ni;
     m1_ei_ram u_ei_ram (
         .clk(clk), .a(f_addr[14:0]), .a15(f_addr[15]),
         .ras_n(f_ras_n), .rd_n(f_rd_n), .wr_n(f_wr_n),
         .cfg(ei_ram_cfg),
-        .din(bus), .dout(ei_ram_dout), .dout_en(ei_ram_en)
+        .din(bus), .dout(ei_ram_dout), .dout_en(ei_ram_en),
+        .a2(dbg_ni_addr[14:0]), .dout2(ei_ram_ni)
     );
 
     // ---- Expansion Interface container: heartbeat, 0x37E0, drive
@@ -272,6 +280,41 @@ module m1_core #(
         .dout(kb_dout), .dout_en(kb_en)
     );
 
+    // ---- non-intrusive debug read (DEBUG-PROTOCOL.md): answer the debug
+    //      core's ni_addr from the memories' second BRAM ports. The mux
+    //      select uses a registered copy of the address so it lines up
+    //      with the registered dout2 data (both valid one clock after
+    //      ni_addr). Memory only, never the bus: the device window
+    //      0x3000-0x37FF reads 0xFF (no side effects behind the running
+    //      program's back), the keyboard region reads the live matrix
+    //      (the matrix is stateless), an unpopulated EI bank reads 0xFF
+    //      like its floating bus. ----
+    reg [15:0] dbg_ni_a_q;
+    always @(posedge clk)
+        dbg_ni_a_q <= dbg_ni_addr;
+    // the mux decodes on [15:10] and the keyboard reads [7:0]; the
+    // memories index with the unregistered dbg_ni_addr directly
+    wire _unused_ni = &{1'b0, dbg_ni_a_q[9:8]};
+
+    wire [7:0] kb_ni;
+    m1_keyboard u_kb_ni (
+        .a(dbg_ni_a_q[7:0]), .kybd_n(1'b0), .keys(keys),
+        .dout(kb_ni),
+        /* verilator lint_off PINCONNECTEMPTY */
+        .dout_en()
+        /* verilator lint_on PINCONNECTEMPTY */
+    );
+
+    wire ni_ei_pop = (~dbg_ni_a_q[14] & (ei_ram_cfg != 2'b00))
+                   | ( dbg_ni_a_q[14] &  ei_ram_cfg[1]);
+    assign dbg_ni_rdata =
+          (dbg_ni_a_q[15:12] <  4'h3)      ? rom_ni      // 0x0000-0x2FFF
+        : (dbg_ni_a_q[15:10] == 6'b001110) ? kb_ni       // 0x3800-0x3BFF
+        : (dbg_ni_a_q[15:10] == 6'b001111) ? vram_ni     // 0x3C00-0x3FFF
+        : (dbg_ni_a_q[15:14] == 2'b01)     ? ram_ni      // 0x4000-0x7FFF
+        : (dbg_ni_a_q[15] & ni_ei_pop)     ? ei_ram_ni   // EI RAM, populated
+        :                                    8'hFF;      // devices/unmapped
+
     // ---- video timing + video RAM + video generator ----
     wire        latch_n;
     wire [5:0]  vd;
@@ -287,13 +330,15 @@ module m1_core #(
         .col(col), .line(line), .row(row), .hdrv(hdrv), .vdrv(vdrv)
     );
 
+    wire [7:0] vram_ni;
     m1_vram u_vr (
         .clk(clk),
         .col(col[5:0]), .row(row[3:0]),
         .vid_n(vid_n), .rd_n(f_rd_n), .wr_n(f_wr_n),
         .a(f_addr[9:0]), .din(bus[5:0]), .din7(bus[7]),
         .dout(vram_dout), .dout_en(vram_en),
-        .vd(vd), .vd7(vd7)
+        .vd(vd), .vd7(vd7),
+        .a2(dbg_ni_addr[9:0]), .dout2(vram_ni)
     );
 
     m1_video_gen #(.FONT_HEX(FONT_HEX)) u_vg (

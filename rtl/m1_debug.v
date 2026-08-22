@@ -29,6 +29,9 @@
 //   0x02              RUN       -> 02
 //   0x03              STEP      -> 03 pc_lo pc_hi   (one instruction)
 //   0x06 a_lo a_hi n_lo n_hi          READ_MEM  -> 06 <n bytes>
+//                        (works under RUN too: served non-intrusively
+//                        from the memories' second BRAM ports via
+//                        ni_addr/ni_rdata — DEBUG-PROTOCOL.md)
 //   0x07 a_lo a_hi n_lo n_hi <bytes>  WRITE_MEM -> 07
 //   0x08 idx a_lo a_hi en             SET_BP    -> 08     (8 slots)
 //   0x09              STATUS    -> 09 flags cause pc_lo pc_hi
@@ -80,7 +83,13 @@ module m1_debug (
     output reg  [15:0] mst_addr,
     output reg  [7:0]  mst_wdata,
     output reg         mst_rd_n,
-    output reg         mst_wr_n
+    output reg         mst_wr_n,
+
+    // non-intrusive read port (DEBUG-PROTOCOL.md): the parent answers
+    // ni_addr from the memories' second BRAM ports two clocks later —
+    // READ_MEM served this way while the machine runs steals nothing
+    output reg  [15:0] ni_addr,
+    input  wire [7:0]  ni_rdata
 );
 
     localparam [7:0] C_HALT = 8'h01, C_RUN  = 8'h02, C_STEP = 8'h03,
@@ -312,6 +321,7 @@ module m1_debug (
         D_RSEND = 4'd13;            // registers: stream the 29 bytes
 
     reg [3:0]  dstate;
+    reg        ni_mode;             // D_MR_* runs on the ni port, not the bus
     reg [7:0]  cmd;
     reg [7:0]  arg [0:3];
     reg [1:0]  arg_i;
@@ -354,6 +364,8 @@ module m1_debug (
             mst_wdata <= 8'h00;
             mst_rd_n  <= 1'b1;
             mst_wr_n  <= 1'b1;
+            ni_mode   <= 1'b0;
+            ni_addr   <= 16'h0000;
             stuff     <= 1'b0;
             feed_i    <= 5'd0;
             cap_i     <= 5'd0;
@@ -385,6 +397,7 @@ module m1_debug (
             master     <= 1'b0;
             mst_rd_n   <= 1'b1;
             mst_wr_n   <= 1'b1;
+            ni_mode    <= 1'b0;
             run_mode   <= 1'b1;
             skip_one   <= 1'b0;
             bp_en      <= 8'h00;
@@ -684,11 +697,23 @@ module m1_debug (
                                     ptr <= {arg[1], arg[0]};
                                     cnt <= {in_data, arg[2]};
                                     if (run_mode || !freeze) begin
-                                        resp[0] <= R_ERR;
-                                        resp_n  <= 3'd1;
-                                        send_i  <= 3'd0;
-                                        after_send <= D_IDLE;
-                                        dstate  <= D_SEND;
+                                        if (cmd == C_RDM) begin
+                                            // non-intrusive read: serve
+                                            // from the parallel BRAM
+                                            // ports, machine untouched
+                                            ni_mode <= 1'b1;
+                                            resp[0] <= C_RDM;
+                                            resp_n  <= 3'd1;
+                                            send_i  <= 3'd0;
+                                            after_send <= D_MR_A;
+                                            dstate  <= D_SEND;
+                                        end else begin
+                                            resp[0] <= R_ERR;
+                                            resp_n  <= 3'd1;
+                                            send_i  <= 3'd0;
+                                            after_send <= D_IDLE;
+                                            dstate  <= D_SEND;
+                                        end
                                     end else if (cmd == C_RDM) begin
                                         resp[0] <= C_RDM;
                                         resp_n  <= 3'd1;
@@ -729,22 +754,32 @@ module m1_debug (
                     end
                 end
 
-                // ---- memory read: one byte per pass ----
+                // ---- memory read: one byte per pass. Two flavors on
+                //      the same states: frozen -> the bus-master path
+                //      (authentic device side effects); ni_mode -> the
+                //      parallel BRAM ports (machine runs on, untouched) ----
                 D_MR_A: begin
                     if (cnt == 16'd0) begin
-                        master <= 1'b0;
-                        dstate <= D_IDLE;
+                        master  <= 1'b0;
+                        ni_mode <= 1'b0;
+                        dstate  <= D_IDLE;
                     end else begin
-                        mst_addr <= ptr;
-                        mst_rd_n <= 1'b0;
-                        dstate   <= D_MR_B;
+                        if (ni_mode)
+                            ni_addr <= ptr;
+                        else begin
+                            mst_addr <= ptr;
+                            mst_rd_n <= 1'b0;
+                        end
+                        dstate <= D_MR_B;
                     end
                 end
                 D_MR_B: dstate <= D_MR_C;
                 D_MR_C: begin
-                    out_data  <= bus;      // registered reads have settled
-                    mst_rd_n  <= 1'b1;     // trailing edge: authentic side
-                    dstate    <= D_MR_D;   // effects on device registers
+                    // registered reads (and the parent's ni mux) settled
+                    out_data <= ni_mode ? ni_rdata : bus;
+                    if (!ni_mode)
+                        mst_rd_n <= 1'b1;  // trailing edge: authentic side
+                    dstate <= D_MR_D;      // effects on device registers
                 end
                 D_MR_D: begin
                     if (!out_valid) begin
