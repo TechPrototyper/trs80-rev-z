@@ -1,0 +1,12 @@
+{
+    "python.defaultInterpreterPath": "/usr/bin/python3",
+    "files.associations": {
+        "*.v": "verilog",
+        "*.sv": "systemverilog"
+    },
+    "search.exclude": {
+        "**/build": true,
+        "**/node_modules": true,
+        "**/obj_dir": true
+    }
+}

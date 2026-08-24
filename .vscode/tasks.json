@@ -1,0 +1,52 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "TRS-80: Build Emulator",
+            "type": "shell",
+            "command": "bash .devcontainer/scripts/setup.sh",
+            "problemMatcher": [],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "TRS-80: Start Machine (debug-tcp=5555)",
+            "type": "shell",
+            "command": "bash .devcontainer/scripts/start_trs80.sh",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "trs80"
+            },
+            "runOptions": {
+                "runOn": "folderOpen"
+            },
+            "background": {
+                "activeInfo": "TRS-80 running on debug-tcp=5555",
+                "beginsPattern": "Starting TRS-80",
+                "endsPattern": "fps \\("
+            }
+        },
+        {
+            "label": "TRS-80: Stop Machine",
+            "type": "shell",
+            "command": "pkill -f 'Vm1_core.*--debug-tcp' || echo 'No TRS-80 process found'",
+            "problemMatcher": []
+        },
+        {
+            "label": "TRS-80: Screen Dump",
+            "type": "shell",
+            "command": "python3 tools/emu_screen_dump.py tcp:5555",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        }
+    ]
+}

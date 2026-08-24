@@ -1,0 +1,49 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "dezog",
+            "request": "launch",
+            "name": "TRS-80 Rev Z (Codespace FPGA)",
+            "remoteType": "revz",
+            "revz": {
+                "target": "fpga",
+                "dongle": "fpga",
+                "transport": {
+                    "kind": "python",
+                    "serial": "tcp:5555",
+                    "bridge": "${workspaceFolder}/tools/trszog_bridge.py",
+                    "autoStart": true,
+                    "python": "/usr/bin/python3"
+                }
+            },
+            "startAutomatically": false
+        },
+        {
+            "type": "dezog",
+            "request": "launch",
+            "name": "TRS-80 Rev Z (with zmac symbols)",
+            "remoteType": "revz",
+            "revz": {
+                "target": "fpga",
+                "dongle": "fpga",
+                "transport": {
+                    "kind": "python",
+                    "serial": "tcp:5555",
+                    "bridge": "${workspaceFolder}/tools/trszog_bridge.py",
+                    "autoStart": true,
+                    "python": "/usr/bin/python3"
+                }
+            },
+            "zmac": [
+                {
+                    "path": "zout/hello.bds"
+                }
+            ],
+            "load": "zout/hello.cmd",
+            "topOfStack": "0x8000",
+            "rootFolder": "${workspaceFolder}",
+            "startAutomatically": false
+        }
+    ]
+}

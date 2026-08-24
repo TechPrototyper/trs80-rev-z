@@ -7,7 +7,6 @@ __pycache__/
 *.dmk
 *.dsk
 *.fst
-*.json
 *.jv1
 *.jv3
 *.svf
@@ -21,4 +20,11 @@ obj_dir/
 roms/*.bin
 roms/*.mem
 roms/*.rom
+roms/*.hex
 sim/build/*.json
+!sim/emu/build/
+.vscode/*.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/settings.json
+zout/

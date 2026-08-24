@@ -1,0 +1,5 @@
+{
+    "initConfiguration": {
+        "contents": "# TRS-80 Rev Z — Codespace\n#\n# The container builds the headless Verilator emulator on first open.\n#\n# ## Quick start\n#\n# 1. Put your Level II ROM at `roms/level2.hex`\n# 2. Wait for the build task to finish (terminal, ~5 min)\n# 3. Press F5 with the \"TRS-80 Rev Z (Codespace FPGA)\" config selected\n#\n# The machine auto-starts on folder open. Use the task palette for:\n#   - TRS-80: Stop Machine\n#   - TRS-80: Screen Dump\n#   - TRS-80: Build Emulator (after RTL changes)\n"
+    }
+}

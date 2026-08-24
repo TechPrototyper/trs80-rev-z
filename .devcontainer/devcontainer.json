@@ -1,0 +1,27 @@
+{
+  "name": "TRS-80 Rev Z — Codespace",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "TechPrototyper.trszog"
+      ],
+      "settings": {
+        "files.associations": {
+          "*.v": "verilog",
+          "*.sv": "systemverilog"
+        }
+      }
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/scripts/setup.sh",
+  "forwardPorts": [5555],
+  "portsAttributes": {
+    "5555": {
+      "label": "TRS-80 debug link",
+      "onAutoForward": "ignore"
+    }
+  }
+}
