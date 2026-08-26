@@ -30,7 +30,19 @@ module m1_core #(
     parameter FONT_HEX = "../rtl/mcm6670_cg1.hex"
 ) (
     input  wire        clk,          // 10.6445 MHz dot clock
-    input  wire        por_rst_n,    // MACHINE reset (async, active low)
+    /* verilator lint_off SYNCASYNCNET */
+    input  wire        por_rst_n,    // MACHINE reset (async, active low). Drives
+                                     // every submodule's async reset AND is
+                                     // observed *synchronously* by m1_debug,
+                                     // through a 2-FF synchronizer (trs_sync,
+                                     // m1_debug.v), in the FPGA POR domain —
+                                     // the debugger must survive a machine
+                                     // reset (ADR-0006 §3a). That deliberate
+                                     // sync+async fan-out on one net is what the
+                                     // SYNCASYNCNET check flags; the sync path is
+                                     // properly synchronized, so the waiver is
+                                     // scoped to this net alone (ADR-0010).
+    /* verilator lint_on SYNCASYNCNET */
     input  wire        dbg_rst_n,    // debug subsystem reset (FPGA POR) —
                                      // survives a machine reset so the
                                      // debugger can observe+report it
