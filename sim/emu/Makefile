@@ -43,9 +43,14 @@ CORE_RTL := ../../rtl/m1_core.v $(RTL) $(CPU_RTL) \
 # Verilator flags for the emulator build (--exe: C++ main, no --binary)
 # FONT_HEX defaults to a path relative to sim/ (the testbench cwd); the
 # emulator binary can be started from anywhere, so bake in the absolute path.
+# MARCH: -march= value for the model build. "native" is right on real
+# hardware; CI building portable multi-arch images overrides it (e.g.
+# x86-64-v3, armv8-a) so the binary runs on any consumer of the image.
+MARCH ?= native
+
 VFLAGS := --exe --cc -Wall +define+TV80_REFRESH \
           -GFONT_HEX='"$(abspath ../../rtl/mcm6670_cg1.hex)"' \
-          -O3 --CFLAGS "-march=native -flto" --LDFLAGS "-flto" \
+          -O3 --CFLAGS "-march=$(MARCH) -flto" --LDFLAGS "-flto" \
           -MAKEFLAGS OPT_FAST=-O3 \
           --build -j 0 \
           --Mdir build/emu
