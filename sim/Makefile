@@ -12,7 +12,14 @@ CPU_RTL   := ../rtl/vendor/tv80/tv80.vlt ../rtl/m1_cpu.v ../rtl/m1_rom.v \
              ../rtl/vendor/tv80/tv80_core.v \
              ../rtl/vendor/tv80/tv80_alu.v ../rtl/vendor/tv80/tv80_mcode.v \
              ../rtl/vendor/tv80/tv80_reg.v
-VFLAGS    := --binary --timing --trace -Wall +define+TV80_REFRESH
+# Verilator >= 5.05x introduced MULTIDRIVENPROC, which fires on the
+# testbench idiom of bumping one error counter from several always blocks —
+# tb-only code, not a design race. Older verilators reject the unknown code,
+# so the waiver is added only when the running verilator understands it.
+VLT_NUM   := $(shell $(VERILATOR) --version 2>/dev/null | awk '{print $$2}' | tr -d . )
+MDP_WAIVER := $(shell [ "$(VLT_NUM)" -ge 5050 ] 2>/dev/null && echo -Wno-MULTIDRIVENPROC)
+
+VFLAGS    := --binary --timing --trace -Wall $(MDP_WAIVER) +define+TV80_REFRESH
 
 TBS       := tb_m1_timing tb_m1_video_gen tb_m1_vram tb_m1_addr_decode tb_m1_io tb_m1_keyboard tb_m1_ei_ram tb_m1_ei tb_m1_fdc tb_m1_cpu
 BINS      := $(foreach t,$(TBS),build/$(t)/V$(t))

@@ -42,6 +42,13 @@
 //     consume MUX/CAS*.
 //   - The RC networks become clean inputs: por_rst_n (power-on), and
 //     reset_btn_n (front-panel button, low = pressed).
+//   - tv80 is driven by a glitch-free gated clock (cpu_gclk = clk gated by
+//     the negedge-captured cpu_cen; forced open while in reset) instead of
+//     clk + cen. Cycle semantics are identical — tv80 sees a rising edge on
+//     exactly the enabled dot-clock edges it previously acted on — but the
+//     simulator can bind the whole CPU evaluation cone to the 1.77 MHz
+//     trigger instead of re-evaluating it at dot rate (ADR-0011; verified
+//     equivalent by the sim/ suite and an 800k-fetch PC-trace diff).
 
 module m1_cpu (
     input  wire        clk,          // dot clock, 10.6445 MHz
@@ -104,8 +111,22 @@ module m1_cpu (
     wire        core_stop;
     reg  [7:0]  di_reg;          // registered read data (tv80s idiom)
 
+    // ------------------------------------------------------------------
+    // Gated CPU clock (ADR-0011). The textbook race-free gate: the enable
+    // is captured on the falling edge, so cpu_gclk rises exactly on the
+    // dot-clock edges where tv80's `if (cen)` used to fire — same edges,
+    // same sampled values. While the CPU is in reset the gate is forced
+    // open so tv80's reset branches see clock edges, exactly as they did
+    // with a free-running clk. Synthesis-wise this is a standard enable
+    // gate; simulation-wise it lets Verilator schedule the entire tv80
+    // cone at 1.77 MHz instead of 10.64 MHz (~1.4x wall-clock overall).
+    // ------------------------------------------------------------------
+    reg cen_lat;
+    always @(negedge clk) cen_lat <= cpu_cen;
+    wire cpu_gclk = clk & (cen_lat | ~cpu_rst_n);
+
     tv80_core #(.Mode(0), .IOWait(1)) z40 (
-        .cen        (cpu_cen),
+        .cen        (1'b1),
         .m1_n       (m1_n),
         .iorq       (core_iorq),
         .no_read    (core_no_read),
@@ -118,7 +139,7 @@ module m1_cpu (
         .reset_n    (cpu_rst_n),
         .busrq_n    (test_n),
         .busak_n    (busak_n),
-        .clk        (clk),
+        .clk        (cpu_gclk),
         .IntE       (core_inte),
         .stop       (core_stop),
         .A          (addr),

@@ -38,6 +38,8 @@
 //   simulation runs as fast as Verilator can manage.  With --throttle it
 //   inserts host-clock sleeps to pace the simulation to real time.
 
+#include <csignal>
+static volatile std::sig_atomic_t g_stop = 0;
 #include "Vm1_core.h"
 #include "Vm1_core___024root.h"
 #include "verilated.h"
@@ -709,11 +711,16 @@ int main(int argc, char** argv)
     Throttle thr;
     thr.set_factor(throttle_factor);
 
+    // Graceful shutdown on SIGINT/SIGTERM: leave the loop so top.final()
+    // runs and profiling/coverage data is flushed on exit (PGO builds).
+    std::signal(SIGINT,  [](int){ g_stop = 1; });
+    std::signal(SIGTERM, [](int){ g_stop = 1; });
+
     // ---- Main simulation loop ----
     bool running = true;
     uint64_t framecnt = 0;
     unsigned dbg_svc_cnt = 0;
-    while (running && !ctx.gotFinish()) {
+    while (running && !ctx.gotFinish() && !g_stop) {
 
         // --- Debug link: sample the handshake pre-edge (clk still 0 and
         // combinationally settled) — a valid/ready pair seen here transfers
