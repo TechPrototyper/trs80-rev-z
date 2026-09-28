@@ -51,12 +51,19 @@ static volatile std::sig_atomic_t g_stop = 0;
 #include "emu_keyboard.h"
 #include "emu_display.h"
 
+// nlohmann/json v3.11.3 (MIT), vendored unmodified — see CREDITS.md and
+// third_party/LICENSE-nlohmann-json.txt. Used only for --config (JSONC:
+// json.hpp's ignore_comments option), never on the RTL/hot simulation path.
+#include "third_party/json.hpp"
+
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <deque>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -74,6 +81,8 @@ static volatile std::sig_atomic_t g_stop = 0;
 #else
 #include <pty.h>        // openpty (link with -lutil on glibc)
 #endif
+
+using json = nlohmann::json;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -133,6 +142,17 @@ static void usage(const char* argv0)
 "  --pctrace=lo:hi:file Log instruction-fetch PCs in [lo,hi] (hex), one @xxxx\n"
 "                       per line (diffable vs trs80gp -tr)\n"
 "\n"
+"Config file (ADR-0012)\n"
+"  --config=<file>      JSONC config, same keys as trs80revz.json (schema in\n"
+"                       trs80-vscode). CLI flags above always win; a config\n"
+"                       key is only applied where the emulator has one (see\n"
+"                       the mapping table in README.md). Without --config, a\n"
+"                       trs80revz.json in the current directory is used if\n"
+"                       present (announced on stderr).\n"
+"  --dry-run            Resolve --rom/--config/CLI into the effective\n"
+"                       configuration, print it, exit 0. Doesn't require\n"
+"                       --rom or touch SDL/audio.\n"
+"\n"
 "  --help | -h          This text. Full descriptions: sim/emu/README.md\n",
         argv0);
 }
@@ -144,6 +164,181 @@ static std::string arg_value(const std::string& arg, const std::string& prefix)
         arg.substr(0, prefix.size()) == prefix)
         return arg.substr(prefix.size());
     return "";
+}
+
+// ---------------------------------------------------------------------------
+// --config: JSONC machine configuration (ADR-0012). Same key set and
+// structure as trs80revz.json — schemas/trs80revz.schema.json in the
+// trs80-vscode repo is the normative definition, and trs80-dev's
+// start_trs80.sh reads the same file the same way for the headless
+// container machine. See the mapping table in README.md.
+//
+// Only fields ConfigTargets exposes are settable this way; other CLI
+// options (--scale, --skin, --kbd, --type, --debug-pty, ...) have no
+// config-file equivalent and stay CLI-only.
+//
+// Design choice, deliberately different from start_trs80.sh: this loader
+// touches an option ONLY when its key is actually present in the file —
+// it never applies the schema's own documented defaults. A config file
+// is a partial override layered on top of the emulator's own built-in
+// defaults, not a full replacement of them; an unrelated config file
+// (e.g. one that only sets `throttle`) can't have the side effect of
+// silently turning the debug TCP listener on. Precedence overall:
+// CLI flags > config file (fields present) > built-in defaults.
+// ---------------------------------------------------------------------------
+struct ConfigTargets {
+    int&          ei_cfg;           // machine.memory: 16k/32k/48k -> 0/1/2
+    bool&         percom;           // machine.percomDoubler
+    std::string (&disk_paths)[4];   // media.disks
+    bool        (&disk_wp)[4];      // media.writeProtect
+    std::string&  cas_path;         // media.cassette
+    int&          cas_baud;         // media.cassetteBaud
+    bool&         sound;            // sound.enabled
+    int&          volume;           // sound.volume
+    bool&         volume_set;
+    int&          debug_tcp;        // debugDongle.enabled/port -> port or 0
+    bool&         throttle;         // throttle
+    double&       throttle_factor;
+};
+
+// Warn (not fatal) about JSON object keys outside `allowed`, prefixed with
+// `scope` (e.g. "machine." for a warning about "machine.frobnicate").
+static void warn_unknown_keys(const json& obj, const std::string& scope,
+                               const std::vector<std::string>& allowed)
+{
+    for (auto it = obj.begin(); it != obj.end(); ++it) {
+        if (std::find(allowed.begin(), allowed.end(), it.key()) == allowed.end())
+            fprintf(stderr, "--config: warning: unknown key '%s%s' ignored\n",
+                    scope.c_str(), it.key().c_str());
+    }
+}
+
+// Parse `path` as JSONC and apply present keys to `t`. Returns false (and
+// prints to stderr) on a missing file or invalid JSON — a config file
+// named via --config is expected to exist and parse; a missing file is a
+// hard error, not a silent skip.
+static bool load_config(const std::string& path, ConfigTargets& t)
+{
+    std::ifstream f(path);
+    if (!f) {
+        fprintf(stderr, "--config: cannot open %s\n", path.c_str());
+        return false;
+    }
+    std::stringstream ss;
+    ss << f.rdbuf();
+
+    json cfg;
+    try {
+        // ignore_comments=true: strip // and /* */ before parsing, the
+        // "C" in JSONC (same tolerance as start_trs80.sh's hand-rolled
+        // stripper and the trs80 extension's jsonc parser).
+        cfg = json::parse(ss.str(), /*cb=*/nullptr, /*allow_exceptions=*/true,
+                           /*ignore_comments=*/true);
+    } catch (const std::exception& e) {
+        fprintf(stderr, "--config: %s is not valid JSONC: %s\n",
+                path.c_str(), e.what());
+        return false;
+    }
+    if (!cfg.is_object()) {
+        fprintf(stderr, "--config: %s: top level must be a JSON object\n",
+                path.c_str());
+        return false;
+    }
+
+    static const std::vector<std::string> top_keys =
+        {"machine", "media", "sound", "debugDongle", "throttle"};
+    warn_unknown_keys(cfg, "", top_keys);
+
+    if (cfg.contains("machine") && cfg["machine"].is_object()) {
+        const json& m = cfg["machine"];
+        warn_unknown_keys(m, "machine.", {"memory", "percomDoubler"});
+        if (m.contains("memory") && m["memory"].is_string()) {
+            std::string mem = m["memory"].get<std::string>();
+            if      (mem == "16k") t.ei_cfg = 0;
+            else if (mem == "32k") t.ei_cfg = 1;
+            else if (mem == "48k") t.ei_cfg = 2;
+            else fprintf(stderr,
+                "--config: machine.memory must be 16k/32k/48k, got '%s' "
+                "- ignored\n", mem.c_str());
+        }
+        if (m.contains("percomDoubler") && m["percomDoubler"].is_boolean())
+            t.percom = m["percomDoubler"].get<bool>();
+    }
+
+    if (cfg.contains("media") && cfg["media"].is_object()) {
+        const json& md = cfg["media"];
+        warn_unknown_keys(md, "media.",
+            {"disks", "writeProtect", "cassette", "cassetteBaud"});
+        // media.disks: an explicit array of up to 4 paths (string or null
+        // per slot). A null/absent *key* is left untouched here — the
+        // schema's "auto-mount disks/*.dmk" fallback is trs80-dev's
+        // start_trs80.sh convention, not something this loader replicates
+        // (no implicit directory scanning from a bare --config).
+        if (md.contains("disks") && md["disks"].is_array()) {
+            const json& arr = md["disks"];
+            for (size_t i = 0; i < arr.size() && i < 4; i++) {
+                if (arr[i].is_string())
+                    t.disk_paths[i] = arr[i].get<std::string>();
+                else if (arr[i].is_null())
+                    t.disk_paths[i].clear();
+            }
+        }
+        if (md.contains("writeProtect") && md["writeProtect"].is_array()) {
+            const json& arr = md["writeProtect"];
+            for (size_t i = 0; i < arr.size() && i < 4; i++)
+                if (arr[i].is_boolean())
+                    t.disk_wp[i] = arr[i].get<bool>();
+        }
+        if (md.contains("cassette")) {
+            if (md["cassette"].is_string())
+                t.cas_path = md["cassette"].get<std::string>();
+            else if (md["cassette"].is_null())
+                t.cas_path.clear();
+        }
+        if (md.contains("cassetteBaud") && md["cassetteBaud"].is_number_integer())
+            t.cas_baud = md["cassetteBaud"].get<int>();
+    }
+
+    if (cfg.contains("sound") && cfg["sound"].is_object()) {
+        const json& s = cfg["sound"];
+        warn_unknown_keys(s, "sound.", {"enabled", "volume"});
+        if (s.contains("enabled") && s["enabled"].is_boolean())
+            t.sound = s["enabled"].get<bool>();
+        if (s.contains("volume") && s["volume"].is_number_integer()) {
+            t.volume     = s["volume"].get<int>();
+            t.volume_set = true;
+        }
+    }
+
+    // debugDongle: enabled/port both map onto the single --debug-tcp
+    // option (there is no separate emulator concept of "dongle" vs.
+    // "link" — see the mapping table in README.md). port only takes
+    // effect if the section is present at all (enabled and/or port);
+    // "enabled": false wins over any port value.
+    if (cfg.contains("debugDongle") && cfg["debugDongle"].is_object()) {
+        const json& d = cfg["debugDongle"];
+        warn_unknown_keys(d, "debugDongle.", {"enabled", "port"});
+        bool enabled = true, enabled_set = false;
+        int  port = 5555;
+        bool port_set = false;
+        if (d.contains("enabled") && d["enabled"].is_boolean()) {
+            enabled     = d["enabled"].get<bool>();
+            enabled_set = true;
+        }
+        if (d.contains("port") && d["port"].is_number_integer()) {
+            port     = d["port"].get<int>();
+            port_set = true;
+        }
+        if (enabled_set || port_set)
+            t.debug_tcp = enabled ? (port_set ? port : 5555) : 0;
+    }
+
+    if (cfg.contains("throttle") && cfg["throttle"].is_number()) {
+        t.throttle        = true;
+        t.throttle_factor = cfg["throttle"].get<double>();
+    }
+
+    return true;
 }
 
 // Load a $readmemh hex file (one byte per line, no address tags).
@@ -527,6 +722,33 @@ int main(int argc, char** argv)
     bool        drive_sounds = true;
     std::string drive_dir;
     double      click_pitch = 1.0;
+    bool        dry_run    = false;
+
+    // ---- Config file: apply BEFORE the CLI loop below, so any of the
+    // same options given explicitly on the command line (in either order)
+    // still win (ADR-0012). ----
+    std::string config_path;
+    bool        config_explicit = false;
+    for (int i = 1; i < argc; i++) {
+        std::string a(argv[i]);
+        if (a.size() > 9 && a.compare(0, 9, "--config=") == 0) {
+            config_path     = a.substr(9);
+            config_explicit = true;
+        }
+    }
+    bool have_config = config_explicit;
+    if (!have_config) {
+        std::ifstream probe("trs80revz.json");
+        if (probe.good()) { config_path = "trs80revz.json"; have_config = true; }
+    }
+    if (have_config) {
+        fprintf(stderr, "config: %s\n", config_path.c_str());
+        ConfigTargets targets{
+            ei_cfg, percom, disk_paths, disk_wp, cas_path, cas_baud,
+            sound, volume, volume_set, debug_tcp, throttle, throttle_factor
+        };
+        if (!load_config(config_path, targets)) return 1;
+    }
 
     for (int i = 1; i < argc; i++) {
         std::string a(argv[i]);
@@ -570,7 +792,46 @@ int main(int argc, char** argv)
         else if (a == "--no-ei")   { ei_cfg = 0; }
         else if (a == "--ei16")    { ei_cfg = 1; }
         else if (a == "--ei32")    { ei_cfg = 2; }
+        else if (a.compare(0, 9, "--config=") == 0) { /* already applied above */ }
+        else if (a == "--dry-run") { dry_run = true; }
         else { fprintf(stderr, "Unknown option: %s\n", a.c_str()); usage(argv[0]); return 1; }
+    }
+
+    if (dry_run) {
+        printf("Effective configuration");
+        if (have_config) printf(" (config: %s)", config_path.c_str());
+        printf(":\n");
+        printf("  rom            = %s\n",
+               rom_path.empty() ? "(not set)" : rom_path.c_str());
+        printf("  machine        = %s%s\n",
+               ei_cfg == 0 ? "16k" : ei_cfg == 1 ? "32k" : "48k",
+               percom ? "" : ", no percom doubler");
+        for (int d = 0; d < 4; d++) {
+            if (disk_paths[d].empty()) continue;
+            printf("  disk%d          = %s%s\n", d, disk_paths[d].c_str(),
+                   disk_wp[d] ? " (write-protected)" : "");
+        }
+        if (!cas_path.empty())
+            printf("  cassette       = %s (baud %d)\n", cas_path.c_str(), cas_baud);
+        if (!cas_save.empty())
+            printf("  cassette save  = %s\n", cas_save.c_str());
+        printf("  sound          = %s (volume %d%s)\n", sound ? "on" : "off",
+               volume, volume_set ? "" : ", default");
+        if (debug_pty)
+            printf("  debug link     = pty\n");
+        else if (debug_tcp)
+            printf("  debug link     = tcp:%d\n", debug_tcp);
+        else
+            printf("  debug link     = off\n");
+        if (throttle)
+            printf("  throttle       = %.3fx real time\n", throttle_factor);
+        else
+            printf("  throttle       = off (as fast as possible)\n");
+        printf("  scale          = %d\n", scale);
+        printf("  skin           = %s\n", skin_name.c_str());
+        printf("  keyboard       = %s\n", kbd_layout.c_str());
+        printf("  hidden         = %s\n", hidden ? "yes" : "no");
+        return 0;
     }
 
     if (rom_path.empty()) {
