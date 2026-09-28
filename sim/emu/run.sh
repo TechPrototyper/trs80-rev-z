@@ -30,12 +30,8 @@ fi
 
 rom="${TRS80_ROM:-}"
 if [ -z "$rom" ]; then
-    for cand in \
-        "$HOME/Projects/fpga-trs80/roms/level2_v13.hex" \
-        "$here/../../roms/level2.hex" \
-        "$HOME/trs80/level2.hex"; do
-        if [ -f "$cand" ]; then rom="$cand"; break; fi
-    done
+    cand="$here/../../roms/level2.hex"
+    if [ -f "$cand" ]; then rom="$cand"; fi
 fi
 if [ -z "$rom" ]; then
     echo "run.sh: no ROM found — set TRS80_ROM=/path/to/level2.hex" >&2
