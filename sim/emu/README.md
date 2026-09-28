@@ -99,6 +99,72 @@ drives 0–3 only; drive numbers above 3 do not exist.
 | `--click-pitch=<f>` | `1.0` | Playback-rate factor for the step voice (0.2–2.0). Samples play at native pitch by default; the bass fullness comes from a fixed 63 Hz chassis thump under every hit |
 | `--pctrace=lo:hi:file` | off | Log every instruction-fetch PC in `[lo,hi]` (hex) to *file*, one `@xxxx` line each — diffable against `trs80gp -tr lo:hi` (this is how the NEWDOS lookup and aj6 boot divergences were root-caused) |
 | `--enter-until=<frame>` | off | Hold ENTER from power-on until the given frame (some DOS mods skip boot prompts on a held ENTER) |
+| `--config=<file>` | none | JSONC config file, same keys as `trs80revz.json` (ADR-0012) — see [Config file](#config-file---config-adr-0012) below. Without `--config`, a `trs80revz.json` in the current directory is used if present |
+| `--dry-run` | off | Resolve `--rom`/`--config`/CLI flags into the effective configuration, print it, and exit 0 — doesn't require `--rom` and never touches SDL/audio |
+
+## Config file (`--config`, ADR-0012)
+
+`--config=<path>` reads a JSONC file (JSON with `//` and `/* */` comments)
+using the **same keys and structure as `trs80revz.json`** — the format
+defined by `schemas/trs80revz.schema.json` in the `trs80-vscode` repo and
+read the same way by `trs80-dev`'s `.devcontainer/scripts/start_trs80.sh`
+for the headless container machine. One config format, three readers.
+
+**Precedence: CLI flags > config file > built-in defaults.** The config
+file only changes an option when its key is actually present — it never
+applies the schema's own documented defaults (e.g. `debugDongle.enabled`
+defaults to `true` in the schema, but a config file that omits the
+`debugDongle` section entirely leaves the emulator's own debug-link-off
+default alone). A CLI flag always wins over whatever the file set,
+regardless of where `--config` sits on the command line.
+
+Without `--config`, a `trs80revz.json` in the current directory is loaded
+automatically if one exists (announced on stderr: `config: trs80revz.json`)
+— matching `start_trs80.sh`'s default. An explicit `--config=<path>` that
+can't be opened, or that isn't valid JSONC, is a hard error. Unknown keys
+in the file are warned about on stderr and otherwise ignored, not fatal.
+
+Every key the schema defines maps onto an existing CLI flag — nothing in
+`trs80revz.json` is presently unsupported by the emulator:
+
+| Config key | CLI flag | Env var (`run.sh`) | Notes |
+|---|---|---|---|
+| `machine.memory` | `--no-ei` / `--ei16` / `--ei32` | — | `"16k"` / `"32k"` / `"48k"` |
+| `machine.percomDoubler` | `--no-percom` | — | Only `false` has an effect — Percom is on by default and there's no flag to force it back on |
+| `media.disks[0..3]` | `--disk0=` … `--disk3=` | — | Index-matched. `null`/absent mounts nothing; the schema's "auto-mount `disks/*.dmk`" fallback for an absent `disks` key is `start_trs80.sh`'s own convention (directory globbing relative to its workspace root) and isn't replicated by `--config` |
+| `media.writeProtect[0..3]` | `--wp0` … `--wp3` | — | Only has an effect on a drive that also has a disk mounted |
+| `media.cassette` | `--cas=` | — | |
+| `media.cassetteBaud` | `--cas-baud=` | — | |
+| `sound.enabled` | *(absence of)* `--no-sound` | — | `false` forces sound off; `true` just leaves `--no-sound` unset (sound is the emulator's own default) |
+| `sound.volume` | `--volume=` | — | |
+| `debugDongle.enabled` | *(absence of)* `--debug-tcp=` | — | `false` forces the debug link off even if `port` is also set |
+| `debugDongle.port` | `--debug-tcp=<port>` | — | Only takes effect when `enabled` is true (default `5555` if `port` is omitted) |
+| `throttle` | `--throttle=<f>` | `TRS80_THROTTLE` (via `run.sh`, not `--config`) | |
+
+Paths in `media.disks`/`media.cassette` are resolved relative to the
+current working directory (not the config file's own location) when not
+absolute — run the emulator from the directory the paths are written
+against, same as any other relative `--disk0=`/`--cas=` argument.
+
+```jsonc
+// trs80revz.json — machine configuration, same format the trs80 VS Code
+// extension writes and start_trs80.sh reads.
+{
+  "machine": { "memory": "48k", "percomDoubler": true },
+  "media": {
+    "disks": ["disks/nd80aj6.dmk", null, null, null],
+    "cassette": null
+  },
+  "sound": { "enabled": true, "volume": 60 },
+  "debugDongle": { "enabled": true, "port": 5555 },
+  "throttle": 0.7
+}
+```
+
+```
+sim/emu/build/emu/Vm1_core --rom=roms/level2.hex --config=trs80revz.json
+sim/emu/build/emu/Vm1_core --config=trs80revz.json --dry-run   # inspect, no ROM needed
+```
 
 ## Quick start
 
