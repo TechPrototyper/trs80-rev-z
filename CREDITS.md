@@ -2,6 +2,8 @@
 
 This project stands on the shoulders of giants! Their prior work was used either under its 
 license or with the author's explicit permission. Per-file provenance is additionally recorded in source headers.
+The two relicensed-with-permission portions (PACE, big80) are called out specifically in
+[NOTICE.md](NOTICE.md).
 
 ## Code lineage
 
