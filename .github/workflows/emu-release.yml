@@ -87,9 +87,16 @@ jobs:
           make MARCH=${{ matrix.march }} 2>&1 | tee "$RUNNER_TEMP/build.log"
           # VFLAGS already carries -Wall (Makefile); fail the job if either
           # Verilator's own %Warning or a compiler "warning:" slipped past
-          # CLAUDE.md's "-Wall clean under Verilator" requirement.
-          if grep -Ei '(^%Warning|[Ww]arning:)' "$RUNNER_TEMP/build.log"; then
-            echo "::error::Build produced warnings — see log above"
+          # CLAUDE.md's "-Wall clean under Verilator" requirement. Exclude
+          # gcc's own lto-wrapper note ("using serial compilation of N
+          # LTRANS jobs") — LTO parallelism info, not a code warning;
+          # confirmed present on a clean Linux/gcc build (Docker, E2 local
+          # verification) and absent on the macOS/clang build.
+          warnings=$(grep -Ei '(^%Warning|: warning:)' "$RUNNER_TEMP/build.log" \
+                     | grep -v '^lto-wrapper:' || true)
+          if [ -n "$warnings" ]; then
+            echo "::error::Build produced warnings:"
+            echo "$warnings"
             exit 1
           fi
           make dist DIST_NAME=${{ matrix.name }}
