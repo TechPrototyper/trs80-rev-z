@@ -1,0 +1,134 @@
+name: Emulator release build
+
+# Builds sim/emu (the interactive Verilator emulator) for macOS/arm64,
+# Linux/amd64, and Linux/arm64, and attaches the resulting tarballs to a
+# GitHub Release on an `emu-v*` tag. `workflow_dispatch` runs the same
+# build (and uploads the same workflow artifacts) without a tag, for a
+# manual sanity check — no Release is created in that case.
+#
+# Windows is out of scope (--debug-pty relies on openpty(); see the
+# "Windows" note in sim/emu/README.md and ADR-0012's future-work note).
+#
+# oss-cad-suite pins the SAME release tag trs80-dev's Dockerfile uses, so
+# the two build environments stay comparable. Bump OSS_CAD_TAG/STAMP here
+# and there together if you ever move it.
+#
+# This file has not been run — GitHub Actions isn't reachable from the
+# environment that wrote it. It was checked as carefully as reading the
+# Makefile allows; verify the first real run before trusting it blindly.
+
+on:
+  push:
+    tags:
+      - 'emu-v*'
+  workflow_dispatch: {}
+
+env:
+  OSS_CAD_TAG: '2026-08-26'
+  OSS_CAD_STAMP: '20260826'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            name: trs80-emu-macos-arm64
+            oss_arch: darwin-arm64
+            march: armv8-a
+          - os: ubuntu-24.04
+            name: trs80-emu-linux-amd64
+            oss_arch: linux-x64
+            march: x86-64-v3
+          - os: ubuntu-24.04-arm
+            name: trs80-emu-linux-arm64
+            oss_arch: linux-arm64
+            march: armv8-a
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SDL2 (apt)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libsdl2-dev
+
+      - name: Install SDL2 (brew)
+        if: runner.os == 'macOS'
+        run: brew install sdl2
+
+      # Prebuilt Verilator from the same oss-cad-suite-build release
+      # trs80-dev's Dockerfile uses (see the module comment above) —
+      # extracted under $RUNNER_TEMP so no sudo/root-owned /opt is needed
+      # on either runner OS.
+      - name: Install Verilator (oss-cad-suite)
+        run: |
+          set -euo pipefail
+          url="https://github.com/YosysHQ/oss-cad-suite-build/releases/download/${OSS_CAD_TAG}/oss-cad-suite-${{ matrix.oss_arch }}-${OSS_CAD_STAMP}.tgz"
+          echo "Fetching $url"
+          curl -sSL -o "$RUNNER_TEMP/oss-cad-suite.tgz" "$url"
+          mkdir -p "$RUNNER_TEMP/toolchain"
+          tar xzf "$RUNNER_TEMP/oss-cad-suite.tgz" -C "$RUNNER_TEMP/toolchain"
+          echo "$RUNNER_TEMP/toolchain/oss-cad-suite/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Verilator
+        run: verilator --version
+
+      - name: Build (-Wall clean) and package
+        run: |
+          set -euo pipefail
+          cd sim/emu
+          make clean
+          make MARCH=${{ matrix.march }} 2>&1 | tee "$RUNNER_TEMP/build.log"
+          # VFLAGS already carries -Wall (Makefile); fail the job if either
+          # Verilator's own %Warning or a compiler "warning:" slipped past
+          # CLAUDE.md's "-Wall clean under Verilator" requirement.
+          if grep -Ei '(^%Warning|[Ww]arning:)' "$RUNNER_TEMP/build.log"; then
+            echo "::error::Build produced warnings — see log above"
+            exit 1
+          fi
+          make dist DIST_NAME=${{ matrix.name }}
+
+      # Smoke test: --dry-run needs no ROM, so this exercises the built
+      # binary (and --config parsing, ADR-0012) even in this ROM-less repo.
+      - name: Smoke test (--dry-run)
+        run: |
+          set -euo pipefail
+          bin="sim/emu/dist/${{ matrix.name }}/Vm1_core"
+          "$bin" --config="sim/emu/trs80revz.sample.json" --dry-run
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: sim/emu/dist/${{ matrix.name }}.tar.gz
+          if-no-files-found: error
+
+  release:
+    # Only on the tag push, not on workflow_dispatch.
+    if: startsWith(github.ref, 'refs/tags/emu-v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect tarballs
+        run: |
+          mkdir -p release
+          find artifacts -name '*.tar.gz' -exec cp {} release/ \;
+          ls -la release
+
+      - name: Create/update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.tar.gz
+          generate_release_notes: true
