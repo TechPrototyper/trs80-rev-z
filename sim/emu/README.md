@@ -13,10 +13,56 @@ This directory builds a self-contained interactive emulator that runs the full
 
 No RTL is modified.  The existing `sim/tb_*.sv` tests remain unaffected.
 
-Linux and macOS are supported. Windows is not currently supported (the
-`--debug-pty` link relies on `openpty()`).
+Linux and macOS are supported. **Windows is not supported yet** —
+`--debug-pty` relies on POSIX `openpty()`, which Windows doesn't have.
+The planned path there is TCP-only: `--debug-tcp=<port>` (already the
+recommended option on Linux/macOS too — see the option table below)
+needs no pty at all, so it should work unmodified once the rest of the
+emulator (SDL2, the build itself) is confirmed to build on Windows —
+that confirmation hasn't happened yet. Tracked as future work, not on
+the current roadmap.
+
+## Download
+
+No Verilator/build toolchain needed — grab a prebuilt binary:
+
+1. Go to the [Releases page](https://github.com/TechPrototyper/trs80-rev-z/releases)
+   and download the `trs80-emu-<os>-<arch>.tar.gz` for your platform
+   (`trs80-emu-macos-arm64`, `trs80-emu-linux-amd64`, or
+   `trs80-emu-linux-arm64`).
+2. Unpack it: `tar xzf trs80-emu-*.tar.gz`. It contains the `Vm1_core`
+   binary, this README, `LICENSE`/`NOTICE.md`, and a sample
+   `trs80revz.sample.json` (ADR-0012).
+3. **macOS only:** the binary isn't code-signed or notarized (no Apple
+   Developer account behind this project), so Gatekeeper will refuse to
+   run it straight out of the archive. Clear the quarantine flag once:
+   ```
+   xattr -d com.apple.quarantine Vm1_core
+   ```
+4. **Runtime dependency: SDL2.** The binary links SDL2 dynamically — it
+   isn't bundled. Install it once (`brew install sdl2` on macOS,
+   `apt install libsdl2` on Debian/Ubuntu — the `-dev` package isn't
+   needed at runtime, only `libsdl2-2.0-0` itself).
+5. **The ROM is not included** (see [`roms/README.md`](../../roms/README.md)
+   — it's Tandy/Microsoft copyrighted and this repo ships none). Supply
+   your own: either `--rom=/path/to/level2.hex` on the command line, the
+   `TRS80_ROM` environment variable (same as `run.sh`), or point
+   `--config` at a `trs80revz.json` — though note `machine`/`media`/etc.
+   in that file configure everything *except* the ROM path, which has no
+   schema key; `--rom=`/`TRS80_ROM` are still how you supply it even when
+   using `--config` (see ADR-0012 and the mapping table below).
+
+```
+tar xzf trs80-emu-macos-arm64.tar.gz
+cd trs80-emu-macos-arm64
+xattr -d com.apple.quarantine Vm1_core        # macOS only
+TRS80_ROM=/path/to/level2.hex ./Vm1_core --config=trs80revz.sample.json
+```
 
 ## Prerequisites
+
+Building from source instead (e.g. a platform without a release
+tarball, or to track `main`):
 
 ```
 # Debian / Ubuntu
