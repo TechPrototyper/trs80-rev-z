@@ -51,7 +51,12 @@ make run ROM=/path/to/rom.hex DISK0=/path/to/newdos.dmk
 
 The Level II ROM (12 KiB) is **not** included in this repository — see
 `roms/README.md` for provenance and identification.  The file must be in
-Verilog `$readmemh` format (one hex byte per line, no address tags).
+Verilog `$readmemh` format (one hex byte per line, no address tags), not a
+raw binary. If you only have a raw `.rom` dump, convert it once:
+
+```
+sim/tools/bin2hex.py roms/level2.rom roms/level2.hex
+```
 
 ### DMK disk images
 

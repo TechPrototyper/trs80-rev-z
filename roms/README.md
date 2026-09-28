@@ -20,7 +20,7 @@ from a source you are comfortable with. Reference version is **1.3** (~July 1980
 | `MEM SIZE?` and banner `R/S L2 BASIC` | **1.3** — the reference |
 | `MEMORY SIZE?` and `RADIO SHACK LEVEL II BASIC` | early (1.0–1.2) — works, but not the verification reference |
 
-Other ** dumps** in circulation:
+Other dumps in circulation:
 
 - **14336 bytes (14 K)** instead of 12288: contains 2 KB of third-party code at `$3000`
   where the real machine has no ROM at all. I haven't looked into that, but for sure it's
@@ -30,6 +30,18 @@ Other ** dumps** in circulation:
 - Anything advertised as "Level II" that types differently than the table above.
 
 
-Place your image as `roms/level2.rom` (gitignored) or point the loader at it — see the
-board documentation once M1 lands.
+Place your image as `roms/level2.rom` (gitignored) or point the loader at it.
+
+## Converting to the format the machine actually loads
+
+Both `sim/emu` and the RTL's ROM loaders read `$readmemh` hex (one hex byte
+per line, no address tags) — not a raw binary. Convert once:
+
+```
+sim/tools/bin2hex.py roms/level2.rom roms/level2.hex
+```
+
+`sim/emu/run.sh` picks up `roms/level2.hex` automatically if present, or
+point it at any hex file via `TRS80_ROM=/path/to/level2.hex`. See
+[sim/emu/README.md](../sim/emu/README.md) for the emulator's `--rom=` flag.
 
