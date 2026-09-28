@@ -32,7 +32,7 @@ You can implement against **either** layer:
 - **Layer 2 (JSON-RPC)** is what the bridge (`tools/trszog_bridge.py`) or
   the ESP32 server *exposes* to a debugger. Target this to plug in a
   different debugger while reusing our bridge. It is the compatibility
-  surface a debug-enabled trs80gp also might speak, so one debugger could then
+  surface a debug-capable emulator server also might speak, so one debugger could then
   drive the integrated simulator, the gold-standard emulator, this FPGA machine,
   or a real TRS-80 behind a dongle, interchangeably.
 
@@ -147,10 +147,10 @@ real response. (The reference bridge does exactly this.)
 TCP, line-delimited **JSON-RPC 2.0**: every request, response, and
 notification is one JSON object terminated by `\n`. The debugger connects as
 a TCP client. Requests carry `id`; notifications (server → client) carry
-none. This is the surface a debug-enabled trs80gp also exposes, so a
+none. This is the surface a debug-capable emulator server also exposes, so a
 debugger written against it drives the emulator or our backend unchanged.
 It is distilled from the [trszog](https://github.com/TechPrototyper/trszog)
-client, the debug-enabled trs80gp server, and trszog's mock server; where
+client, that debug-capable emulator server, and trszog's mock server; where
 those disagree, this document is normative.
 
 ## Data conventions
@@ -166,9 +166,10 @@ what it accepts and strict in what it emits:
 - **Memory payloads:** plain hex string, two chars per byte, no separators.
 - **Register values outbound:** `0x`-prefixed uppercase hex, width-padded
   (16-bit: 4 digits, 8-bit: 2).
-- **`readMemory` byte count:** the debug-enabled trs80gp expects `length`;
-  trszog's client and mock server use `size`. Normative: **accept both,
-  `length` wins if both are present**; echo the count back as `size`.
+- **`readMemory` byte count:** that debug-capable emulator server expects
+  `length`; trszog's client and mock server use `size`. Normative:
+  **accept both, `length` wins if both are present**; echo the count back
+  as `size`.
 
 ## Methods
 
@@ -198,13 +199,13 @@ Errors use standard JSON-RPC error objects (`-32601` unknown method,
 
 The ADR-0007 promise — *advertise the backend's real capabilities rather
 than masquerading* — is kept in the `initialize` result. `capabilities`
-is an optional object; a missing object (the debug-enabled trs80gp emits
-none) or a missing key means "assume the trs80gp baseline" so stock
-clients keep working. Keys defined so far:
+is an optional object; a missing object (that debug-capable emulator
+server emits none) or a missing key means "assume that server's
+baseline" so stock clients keep working. Keys defined so far:
 
 | Key | Type | Meaning |
 |---|---|---|
-| `setRegister` | bool | `setRegister` actually works (the trs80gp build's is broken) |
+| `setRegister` | bool | `setRegister` actually works (that server's is broken) |
 | `stepOver` | bool | native `stepOver` (temp hardware breakpoint after CALL/RST/DJNZ) |
 | `breakpoints` | number | hardware PC-breakpoint slots (7 usable; slot 8 is the stepOver temp) |
 | `watchpoints` | number | hardware data-watchpoint slots (0 = none, see `x-setWatchpoints`) |
@@ -261,7 +262,7 @@ emulator's debug server does not have at all.
 ### Stop notifications
 
 After `continue`/`pause`/`stepInto`/`stepOver`, the halt is reported
-asynchronously. The debug-enabled trs80gp emits (live-verified):
+asynchronously. That debug-capable emulator server emits (live-verified):
 
 ```json
 {"jsonrpc":"2.0","method":"stopped","params":{"reason":"breakpoint", ...}}
@@ -270,7 +271,7 @@ asynchronously. The debug-enabled trs80gp emits (live-verified):
 The mock server instead emits `paused` (reasons `user_request`,
 `step_complete`) and `breakpoint`. Normative for our backend: **emit
 `stopped`** with `reason` ∈ `breakpoint` | `step` | `pause` | `watchpoint` | `reset`
-and, where known, `address` — matching the real emulator, which is what the
+and, where known, `address` — matching that server, which is what the
 client is tested against.
 
 ## Known divergences (and what we do about them)
@@ -278,8 +279,8 @@ client is tested against.
 1. **`size` vs `length`** — see above; we accept both. (Against the real
    emulator, a `size`-only client silently reads one byte — worth knowing
    when comparing backends.)
-2. **`stepOver`, `status`** — the debug-enabled trs80gp answers "unknown
-   method"; the mock implements both. Our backend implements `stepOver`
+2. **`stepOver`, `status`** — that debug-capable emulator server answers
+   "unknown method"; the mock implements both. Our backend implements `stepOver`
    natively (temporary breakpoint after the call/repeat instruction — the
    hardware breakpoint comparator makes this cheap) and omits `status`
    until the client actually uses it.
@@ -310,13 +311,13 @@ capabilities, so stock trszog remains fully functional.
 ## Verification plan
 
 This is the first subsystem of this project **without a golden model** —
-deliberately. Parts of the debug-enabled trs80gp server work and stay
+deliberately. Parts of that debug-capable emulator server work and stay
 useful for *selective cross-checks*; but the defect classes observed so
 far rule it out as a reference: some methods are missing, some responses
 are malformed JSON, some paths are extremely slow, and memory
 breakpoints do not work at all (the `size`/`length` split above is only
 the visible tip). A precise defect inventory is still to be written —
-until then the rule is: cross-check against trs80gp only where it is
+until then the rule is: cross-check against that server only where it is
 known-good, and never let it arbitrate. **This document is normative.**
 
 The backend therefore earns its checkmark two ways: (1) a spec-driven

@@ -20,9 +20,9 @@ Three assets shape the decision:
 
 1. **trszog** ([TechPrototyper/trszog](https://github.com/TechPrototyper/trszog),
    a DeZog fork) already debugs TRS-80 programs in VS Code against a
-   debug-enabled trs80gp over a small JSON-RPC protocol; symbol handling
-   (zmac `.bds`) works. The protocol is small, line-delimited, and fully
-   distilled in [docs/DEBUG-PROTOCOL.md](../DEBUG-PROTOCOL.md).
+   debug-capable emulator server over a small JSON-RPC protocol; symbol
+   handling (zmac `.bds`) works. The protocol is small, line-delimited,
+   and fully distilled in [docs/DEBUG-PROTOCOL.md](../DEBUG-PROTOCOL.md).
 2. **This machine's seams** make debugging almost unfairly easy: `cpu_cen`
    (ADR-0001) freezes the CPU between T-states; BRAM is dual-ported (memory
    inspection without stealing the bus); every strobe of the bus idiom is
@@ -152,10 +152,10 @@ board-level selection, and the reset input switches source with it.
 
 1. **D1 — debug core + ESP32 server on this machine**, verified by a
    spec-driven conformance suite (DEBUG-PROTOCOL.md §Verification).
-   Deliberately *not* a golden against the debug-enabled trs80gp: its
-   server has known defects, and adopting its behavior would freeze
+   Deliberately *not* a golden against a debug-capable emulator server:
+   it has known defects, and adopting its behavior would freeze
    them in. For the first time in this project the spec itself is the
-   reference — trs80gp informs, the document decides.
+   reference — that server informs, the document decides.
 2. **D2 — Model 1 adapter hardware** (level shifting, edge connector,
    IM-2/WAIT\*/TEST\* primitives), reusing the D1 stub and server.
 3. **D3 — Model 3/4**, separate ADR when D2 exists.

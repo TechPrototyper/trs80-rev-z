@@ -2,7 +2,7 @@
 """trszog <-> FPGA debug bridge (ADR-0006 D1, docs/DEBUG-PROTOCOL.md).
 
 Speaks newline-delimited JSON-RPC 2.0 with trszog on a local TCP port
-(what a debug-enabled trs80gp would provide) and binary protocol v0
+(what a debug-capable emulator server would provide) and binary protocol v0
 with the machine's debug core over the ULX3S FTDI serial port. This is
 the reference implementation of the translation layer; the ESP32 debug
 server ports exactly this logic.
