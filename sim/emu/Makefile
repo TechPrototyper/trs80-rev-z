@@ -12,6 +12,12 @@
 #   make                      — build trs80emu
 #   make run ROM=path.hex     — build and run (no disk)
 #   make run ROM=path.hex DISK0=newdos.dmk   — run with drive 0
+#   make dist                 — assemble a release tarball (dist/*.tar.gz):
+#                                binary + README + LICENSE/NOTICE + sample
+#                                config. DIST_NAME overrides the archive
+#                                name (.github/workflows/emu-release.yml
+#                                sets it per matrix leg; without it, make
+#                                dist guesses from `uname`)
 #   make clean
 
 VERILATOR ?= verilator
@@ -77,7 +83,16 @@ SRCS := main.cpp emu_disk.cpp emu_cass.cpp emu_audio.cpp emu_keyboard.cpp emu_di
 
 EMU := build/emu/Vm1_core
 
-.PHONY: all run clean
+# Release tarball name: OS-arch, e.g. trs80-emu-darwin-arm64,
+# trs80-emu-linux-x64 (matching oss-cad-suite-build's own asset naming, so
+# the two are easy to cross-reference). Override with DIST_NAME=... for CI;
+# left alone, `make dist` guesses from the local `uname`.
+UNAME_M   := $(shell uname -m)
+DIST_OS   := $(shell echo $(UNAME_S) | tr '[:upper:]' '[:lower:]')
+DIST_NAME ?= trs80-emu-$(DIST_OS)-$(UNAME_M)
+DIST_DIR  := dist/$(DIST_NAME)
+
+.PHONY: all run clean dist
 
 all: $(EMU)
 
@@ -101,5 +116,16 @@ run: $(EMU)
 	  $(if $(THROTTLE),--throttle) \
 	  $(EXTRA_ARGS)
 
+dist: $(EMU)
+	rm -rf $(DIST_DIR)
+	mkdir -p $(DIST_DIR)
+	cp $(EMU) $(DIST_DIR)/
+	cp README.md $(DIST_DIR)/
+	cp trs80revz.sample.json $(DIST_DIR)/
+	cp ../../LICENSE $(DIST_DIR)/LICENSE
+	cp ../../NOTICE.md $(DIST_DIR)/NOTICE.md
+	tar czf dist/$(DIST_NAME).tar.gz -C dist $(DIST_NAME)
+	@echo "dist/$(DIST_NAME).tar.gz"
+
 clean:
-	rm -rf build/
+	rm -rf build/ dist/

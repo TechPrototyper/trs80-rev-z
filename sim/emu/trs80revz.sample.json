@@ -1,0 +1,32 @@
+// trs80revz.json — sample machine configuration.
+//
+// Same format the trs80 VS Code extension writes and validates
+// (schemas/trs80revz.schema.json in the trs80-vscode repo) and that
+// trs80-dev's start_trs80.sh reads for the headless container machine.
+// See ADR-0012 and the mapping table in README.md for how each key
+// below maps onto the emulator's own CLI flags.
+//
+// Every key is optional; a --config file only needs to set the ones it
+// wants to override. Try it:
+//   Vm1_core --config=trs80revz.sample.json --dry-run
+{
+  "machine": {
+    "memory": "48k",
+    "percomDoubler": true
+  },
+  "media": {
+    "disks": [null, null, null, null],
+    "writeProtect": [false, false, false, false],
+    "cassette": null,
+    "cassetteBaud": 500
+  },
+  "sound": {
+    "enabled": true,
+    "volume": 60
+  },
+  "debugDongle": {
+    "enabled": true,
+    "port": 5555
+  },
+  "throttle": 0.7
+}
