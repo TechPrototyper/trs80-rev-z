@@ -52,6 +52,10 @@ the days, which was sold, unfortunately, because we still had and kept the Model
 - **Sean Barrett (nothings)** — `stb_image.h` v2.30, single-header image decoder
   (public domain / MIT dual license), vendored unmodified as
   `sim/emu/third_party/stb_image.h` to load the JPEG skin assets.
+- **Niels Lohmann** — `nlohmann/json` v3.11.3, single-header JSON/JSONC parser
+  (MIT), vendored unmodified as `sim/emu/third_party/json.hpp` (license text:
+  `sim/emu/third_party/LICENSE-nlohmann-json.txt`) to read the emulator's
+  `--config` file — see [ADR-0012](docs/decisions/0012-emulator-config-file.md).
 - **George Phillips** — the emulator can play trs80gp's drive-sound recordings
   (`loaded-spin.wav`, `motor.wav`, `step.wav`) directly from the user's own
   trs80gp installation via `--drive-sounds`; the files are loaded in place at
