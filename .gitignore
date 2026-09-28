@@ -1,24 +1,36 @@
-
-__pycache__/
+# OS noise
 .DS_Store
+
+# Python build artifacts
+__pycache__/
+
+# Local tool config (not the project's — this machine's Claude Code overrides)
+.claude/settings.local.json
+
+# Build artifacts: synthesis, place & route, and simulation outputs
+# (all regenerable — see docs/decisions/ for the tools that produce them)
 *.asc
 *.bit
+*.fst
+*.svf
+*.vcd
+build/
+obj_dir/
+sim/build/*.json
+boards/ulx3s/build/*.json
+
+# Media test fixtures and images produced by sim/tools/build_*.py —
+# regenerable, never hand-authored, never committed
 *.cas
 *.dmk
 *.dsk
-*.fst
-*.json
 *.jv1
 *.jv3
-*.svf
-*.vcd
-# Build artifacts
-# OS noise
-# ROM images and other copyrighted binaries — never committed (see roms/README.md)
-# Synthesis netlist (make synth) — regenerable, not committed
-build/
-obj_dir/
+
+# ROM images and other copyrighted binaries — never committed (see roms/README.md).
+# *.hex included: it's the same copyrighted ROM content, just $readmemh-encoded
+# (see sim/tools/bin2hex.py).
 roms/*.bin
+roms/*.hex
 roms/*.mem
 roms/*.rom
-sim/build/*.json
