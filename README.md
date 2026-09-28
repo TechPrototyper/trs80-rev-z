@@ -42,12 +42,15 @@ we fix the RTL once and validate it in simulation and on silicon.
 
 ## Where it stands
 
-The machine is real: it boots TRSDOS 2.3 and NEWDOS/80 from SD card to
-`DOS READY` on a physical ULX3S — monitor over HDMI, USB keyboard, mixed-density
-and double-sided DMK disks, video snow included. The cassette is real too:
-Space Invaders loads from a 500-baud WAV via `SYSTEM`, and `CSAVE`/`CLOAD`
-round-trip byte-exact — read and write timing pinned against trs80gp. On top
-sits a debug core that halts and single-steps the live Z80 from VS Code —
+The machine is real: on the physical ULX3S it comes up over HDMI and boots
+TRSDOS 2.3 from SD card to `DOS READY` — verified on silicon on 2026-07-25.
+The USB keyboard is simulation-verified byte-exact against trs80gp; its
+hardware smoke test is still ahead. The SD-card cassette deck is
+simulation-verified byte-exact against trs80gp — Space Invaders loads from a
+500-baud WAV via `SYSTEM`, and `CSAVE`/`CLOAD` round-trip byte-exact — with
+its hardware smoke test still ahead. Mixed-density and double-sided DMK
+disks are simulation-verified, hardware smoke test likewise still ahead. On
+top sits a debug core that halts and single-steps the live Z80 from VS Code —
 which since the trszog `revz` remote also shows the machine's screen as a
 live panel and types into its keyboard, with memory reads that steal zero
 CPU cycles (a second BRAM port, not an ICE trick). And
