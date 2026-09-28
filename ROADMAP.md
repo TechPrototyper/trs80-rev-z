@@ -202,18 +202,30 @@ VRAM comparison against trs80gp, then on the ULX3S over HDMI with a USB keyboard
       in the golden harness (`make golden-boot`) *and* on the physical board
       from SD card; NEWDOS/80 2.0 boots nicely, too.
 
-### M4 - the softcore debugging "dongle" "sitting" on the TRS-80 Model 1 40-pin expansion port.
+### M4 - the debug core (implemented) and the physical "dongle" on the TRS-80 Model 1 40-pin expansion port (vision, ADR-0009).
 
-- [X] **Debug core.** A softcore (RISC-V) beside the Z80 speaking a VS-Code-debuggable
-      protocol ([docs/DEBUG-PROTOCOL.md](docs/DEBUG-PROTOCOL.md)): hardware breakpoints, memory inspection without stopping the Z80,
-      single-step. The bridge between 1980 hardware and a modern IDE (via [trszog](https://github.com/TechPrototyper/trszog), which supports this debug protocol). The board's 32 MB
-      SDRAM would serve this rather than inflating the machine: a **flight recorder**
-      (gapless bus-cycle trace, minutes deep — reverse debugging on 1980 hardware),
-      **machine snapshots/rewind**, and a RAM-resident disk-image library. The flight
-      recorder would export standard **VCD/FST** — real-hardware traces opening in the same
-      waveform tools as the Verilator traces, making the two *diffable*: golden-model
-      verification extended to actual silicon. The Z80 itself stays 48 K — the surplus
-      power works *for* the small machine, never inside it.
+- [X] **Debug core.** A hardware FSM beside the Z80 (`rtl/m1_debug.v`: a `cpu_cen`
+      gate, bus-level prefix tracker, PC comparators, and bus-mastering logic behind a
+      byte-oriented host protocol — no softcore, no second CPU) speaking a
+      VS-Code-debuggable protocol ([docs/DEBUG-PROTOCOL.md](docs/DEBUG-PROTOCOL.md)):
+      hardware breakpoints, memory inspection without stopping the Z80, single-step.
+      The bridge between 1980 hardware and a modern IDE (via
+      [trszog](https://github.com/TechPrototyper/trszog), which supports this debug
+      protocol). Golden through `tb_m1_debug` and live sessions against the Verilator
+      machine (ADR-0006). This is verified on the ULX3S/Verilator side; a real Model 1
+      behind a physical 40-pin dongle is the vision item below, not yet built.
+
+  Vision, not committed ([ADR-0009](docs/decisions/0009-physical-dongle.md) —
+  exploratory, no dates): the same protocol riding a dongle at the Model 1's
+  expansion-interface edge, so the debugger above works unchanged against real
+  1980 hardware. The board's 32 MB SDRAM would serve this rather than inflating
+  the machine: a **flight recorder** (gapless bus-cycle trace, minutes deep —
+  reverse debugging on 1980 hardware), **machine snapshots/rewind**, and a
+  RAM-resident disk-image library. The flight recorder would export standard
+  **VCD/FST** — real-hardware traces opening in the same waveform tools as the
+  Verilator traces, making the two *diffable*: golden-model verification
+  extended to actual silicon. The Z80 itself stays 48 K — the surplus power
+  works *for* the small machine, never inside it.
 
 ### M7 — Sound & Gestalt (the machine you hear and see)
 
