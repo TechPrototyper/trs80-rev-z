@@ -13,6 +13,9 @@ This directory builds a self-contained interactive emulator that runs the full
 
 No RTL is modified.  The existing `sim/tb_*.sv` tests remain unaffected.
 
+Linux and macOS are supported. Windows is not currently supported (the
+`--debug-pty` link relies on `openpty()`).
+
 ## Prerequisites
 
 ```

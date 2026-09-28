@@ -104,6 +104,17 @@ contain.
 
 ## Try it
 
+Prerequisites (all from [oss-cad-suite](https://github.com/YosysHQ/oss-cad-suite-build)
+except SDL2 and Python, which are one system-package install each):
+
+- **Verilator** ≥ 5.x — every testbench, `make golden`, and `sim/emu`
+- **SDL2** — the desktop emulator's display, keyboard, and audio
+  (`apt install libsdl2-dev` / `brew install sdl2`; see
+  [`sim/emu/README.md`](sim/emu/README.md))
+- **python3** — test-image builders and tooling under `sim/tools/` and `tools/`
+- **yosys** and **nextpnr-ecp5** — only needed for `boards/ulx3s && make bit`
+  (real bitstream synthesis)
+
 You don't need hardware to check any claim in this repository:
 
 ```

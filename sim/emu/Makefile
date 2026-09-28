@@ -63,6 +63,13 @@ VFLAGS := --exe --cc -Wall +define+TV80_REFRESH \
 SDL2_CFLAGS := $(shell sdl2-config --cflags 2>/dev/null || echo -I/usr/include/SDL2)
 SDL2_LIBS   := $(shell sdl2-config --libs   2>/dev/null || echo -lSDL2)
 
+# --debug-pty's openpty() lives in libc on macOS (<util.h>) but needs
+# -lutil on glibc (<pty.h>) — see main.cpp's #if defined(__APPLE__).
+UNAME_S := $(shell uname -s)
+ifneq ($(UNAME_S),Darwin)
+SDL2_LIBS += -lutil
+endif
+
 CXXFLAGS_EXTRA := $(SDL2_CFLAGS) -O2 -std=c++17
 LDFLAGS_EXTRA  := $(SDL2_LIBS)
 
