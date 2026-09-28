@@ -1,7 +1,7 @@
 # Vendored: usb_hid_host (nand2mario)
 
 Compact low-speed USB HID host core — keyboards, mice, gamepads. Selected in
-[ADR-0004](docs/decisions/0004-usb-hid-host-core.md).
+[ADR-0004](../../../../docs/decisions/0004-usb-hid-host-core.md).
 
 - Upstream: <https://github.com/nand2mario/usb_hid_host>
 - Author: nand2mario (based on work by hi631), 2023

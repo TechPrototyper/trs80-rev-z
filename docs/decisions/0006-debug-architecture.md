@@ -1,6 +1,13 @@
 # ADR-0006 — Debug architecture: core, protocol, and the road to real hardware
 
-**Status:** proposed · 2026-07-25
+**Status:** accepted, implemented · 2026-08-22 (proposed 2026-07-25) — D1 (debug
+core + wire protocol) is golden through `tb_m1_debug` and in daily use via
+trszog ([ADR-0007](0007-trszog-integration.md), accepted/implemented), over
+`tools/trszog_bridge.py` as the interim host-side stand-in for the ESP32
+server this ADR describes. The ESP32 server firmware itself is its own
+decision, [ADR-0008](0008-esp32-companion.md) (still proposed). D2 (the
+physical Model 1 adapter) is [ADR-0009](0009-physical-dongle.md), vision
+tier — not committed.
 
 ## Context
 
