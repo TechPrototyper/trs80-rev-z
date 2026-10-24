@@ -1,0 +1,44 @@
+edge_pin,signal,trs80_dir,bank,shifter_side,fpga_port,ulx3s_gpio,fpga_site,notes
+1,RAS_N,out,U4,A,m1x_ras_n,GP6,C6,"tri-stated by TEST*; NC on redesigned EI J2"
+2,SYSRES_N,out,U5,A,m1x_sysres_n,GN8,A5,"input only, never tri-stated"
+3,CAS_N,out,U4,A,m1x_cas_n,GN6,C7,"tri-stated by TEST*; NC on redesigned EI J2"
+4,A10,out,U2,A,m1x_a[10],GP23,B17,
+5,A12,out,U2,A,m1x_a[12],GP24,C16,
+6,A13,out,U2,A,m1x_a[13],GN24,D16,
+7,A15,out,U2,A,m1x_a[15],GN25,E14,
+8,GND,-,-,-,-,GND,-,ground plane
+9,A11,out,U2,A,m1x_a[11],GN23,C17,
+10,A14,out,U2,A,m1x_a[14],GP25,D14,
+11,A8,out,U2,A,m1x_a[8],GP22,B15,
+12,OUT_N,out,U4,A,m1x_out_n,GN5,B8,port write strobe
+13,WR_N,out,U4,A,m1x_wr_n,GN4,A8,memory write strobe
+14,INTAK_N,out,U5,A,m1x_intak_n,GP9,A2,"input only; IM-2 vector trick (ADR-0006)"
+15,RD_N,out,U4,A,m1x_rd_n,GP4,A7,memory read strobe
+16,MUX,out,U4,A,m1x_mux,GP7,A6,"tri-stated by TEST*; NC on redesigned EI J2"
+17,A9,out,U2,A,m1x_a[9],GN22,C15,
+18,D4,bidir,U3,A,m1x_d[4],GP2,A9,
+19,IN_N,out,U4,A,m1x_in_n,GP5,C8,port read strobe
+20,D7,bidir,U3,A,m1x_d[7],GN3,C10,
+21,INT_N,in,Q3+U5,-,m1x_int_drv / m1x_int_n_rb,GN27 / GN9,E13 / B1,"open-drain drive (gate active high) + read-back; wire-OR with EI heartbeat"
+22,D1,bidir,U3,A,m1x_d[1],GN0,C11,
+23,TEST_N,in,Q1+U5,-,m1x_test_drv / m1x_test_n_rb,GN26 / GN10,C13 / B4,"open-drain drive + read-back; Phase 1 only"
+24,D6,bidir,U3,A,m1x_d[6],GP3,B9,
+25,A0,out,U1,A,m1x_a[0],GP18,H18,
+26,D3,bidir,U3,A,m1x_d[3],GN1,A11,
+27,A1,out,U1,A,m1x_a[1],GN18,H17,
+28,D5,bidir,U3,A,m1x_d[5],GN2,B10,
+29,GND,-,-,-,-,GND,-,ground plane
+30,D0,bidir,U3,A,m1x_d[0],GP0,B11,
+31,A4,out,U1,A,m1x_a[4],GP20,D18,
+32,D2,bidir,U3,A,m1x_d[2],GP1,A10,
+33,WAIT_N,in,Q2+U5,-,m1x_wait_drv / m1x_wait_n_rb,GP27 / GP10,D13 / C4,open-drain drive + read-back
+34,A3,out,U1,A,m1x_a[3],GN19,G18,
+35,A5,out,U1,A,m1x_a[5],GN20,E17,
+36,A7,out,U1,A,m1x_a[7],GN21,D17,
+37,GND,-,-,-,-,GND,-,ground plane
+38,A6,out,U1,A,m1x_a[6],GP21,C18,
+39,+5V_or_GND,-,-,-,-,-,-,"+5V (limited) on Level I, GND on Level II: DO NOT CONNECT"
+40,A2,out,U1,A,m1x_a[2],GP19,F17,
+-,ADDR_DRV_N,-,U1+U2+U4 DIR,-,m1x_addr_drv_n,GP26,B13,"H = observe (TRS->FPGA), L = FPGA drives; pulled up by LPF"
+-,DATA_DRV_N,-,U3 DIR,-,m1x_data_drv_n,GN7,B6,"H = observe, L = FPGA drives data; pulled up by LPF"
+-,OE_N,-,U1..U4 OE,-,m1x_oe_n,GP8,A4,"10k pull-up on board; FPGA pulls low after config"

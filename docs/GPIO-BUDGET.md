@@ -1,6 +1,8 @@
 # ULX3S GPIO budget — dongle mode, Centronics, RS-232
 
-**Status:** working document, 2026-08-20. Plans the ULX3S header pins
+**Status:** working document, 2026-08-20. **Update 2026-10-24:** the dongle
+interposer now has a concrete 42-pin map and LPF draft — see
+[INTERPOSER-PLAN.md](INTERPOSER-PLAN.md) §5 and `boards/ulx3s/interposer/`. Plans the ULX3S header pins
 *before* any connector or interposer is ordered. Decisions that survive
 contact with hardware graduate into an ADR; sourced constraints below cite
 their records. Header pin *sites* are deliberately not assigned here —

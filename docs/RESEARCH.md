@@ -104,3 +104,25 @@ Kept deliberately public — this is the quality bar working as intended:
   targets stay byte-exact; aj6 now boots to READY like trs80gp and
   loads BASIC.
 
+- **"The Expansion Interface passes the full bus through at J3"** (ADR-0006
+  §Context, ADR-0009) is true only for the **original** EI (PCB 1700077A,
+  Service Manual 1979, 26-1140, schematic sheet 3: J3 "Screen Printer Bus" =
+  "TO TRS-80 INTERFACE BUS (J2)"). The **redesigned** EI (0K units from
+  serial 035000, "[Redesigned PCB]" Service Manual) has at J3 a 34-pin
+  "Buffered Interface Bus" with printer-style signals (DATA STROBE\*, D1–D8,
+  BUSY, OUT OF PAPER\*, SLCT\*, FAULT\*) — not the Z80 bus — and the manual
+  states the Screen Printer is the one peripheral it no longer supports.
+  Its J2 is pin-identical to the keyboard edge except pins 1/3/16 (RAS\*/
+  CAS\*/MUX) = NC. Consequence: the physical dongle attaches to the keyboard
+  edge or to an *original* EI's J3; behind a redesigned EI it would need a
+  Y-interposer. Found while writing docs/INTERPOSER-PLAN.md, 2026-10-24
+  (OCR of the manuals' connector tables; redesigned-EI schematic not
+  re-sighted).
+- **0x3000–0x37FF is one undivided block to the keyboard unit.** The address decoder
+  (Z21 74LS156 strobed by Z73b = OR(A15, RAS\*)) sees only A10–A15 (TRS-80 Technical
+  Manual 1978, pp. 8–11; `rtl/m1_addr_decode.v`). It therefore cannot distinguish the
+  dongle window 0x3000–0x37DF from the EI's registers at 0x37E0–0x37EF: external reads
+  anywhere in the block reach the CPU through the same bus buffers that have served
+  every Expansion Interface since 1978. This closes the INTERPOSER-PLAN §10 item about
+  buffer direction without re-sighting the CardEdgeInterface sheet, and it is what makes
+  the window CPU-executable (ADR-0013). 2026-10-25.

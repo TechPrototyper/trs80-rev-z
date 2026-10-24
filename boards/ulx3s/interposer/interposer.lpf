@@ -1,0 +1,72 @@
+# Model 1 bus interposer — ULX3S header pin sites (DRAFT 2026-10-24)
+# Include from the board LPF once the m1x_* ports exist in the top level.
+# Sites per ulx3s_v20.lpf. Uses GP/GN 0-10 (J1) and GP/GN 18-27 (J2) only:
+# avoids ESP32-shared 11-13 and ADC-shared 14-17. See docs/INTERPOSER-PLAN.md.
+# Default PULLMODE=UP is part of the safety concept (observe direction, OE off).
+
+# --- J1: data, strobes, read-backs, bank controls ---------------------------
+LOCATE COMP "m1x_d[0]"        SITE "B11";  # GP0
+LOCATE COMP "m1x_d[1]"        SITE "C11";  # GN0
+LOCATE COMP "m1x_d[2]"        SITE "A10";  # GP1
+LOCATE COMP "m1x_d[3]"        SITE "A11";  # GN1
+LOCATE COMP "m1x_d[4]"        SITE "A9";   # GP2
+LOCATE COMP "m1x_d[5]"        SITE "B10";  # GN2
+LOCATE COMP "m1x_d[6]"        SITE "B9";   # GP3
+LOCATE COMP "m1x_d[7]"        SITE "C10";  # GN3
+LOCATE COMP "m1x_rd_n"        SITE "A7";   # GP4
+LOCATE COMP "m1x_wr_n"        SITE "A8";   # GN4
+LOCATE COMP "m1x_in_n"        SITE "C8";   # GP5
+LOCATE COMP "m1x_out_n"       SITE "B8";   # GN5
+LOCATE COMP "m1x_ras_n"       SITE "C6";   # GP6
+LOCATE COMP "m1x_cas_n"       SITE "C7";   # GN6
+LOCATE COMP "m1x_mux"         SITE "A6";   # GP7
+LOCATE COMP "m1x_data_drv_n"  SITE "B6";   # GN7
+LOCATE COMP "m1x_oe_n"        SITE "A4";   # GP8
+LOCATE COMP "m1x_sysres_n"    SITE "A5";   # GN8
+LOCATE COMP "m1x_intak_n"     SITE "A2";   # GP9
+LOCATE COMP "m1x_int_n_rb"    SITE "B1";   # GN9
+LOCATE COMP "m1x_wait_n_rb"   SITE "C4";   # GP10
+LOCATE COMP "m1x_test_n_rb"   SITE "B4";   # GN10
+
+# --- J2: address bus, master-mode controls ---------------------------------
+LOCATE COMP "m1x_a[0]"        SITE "H18";  # GP18
+LOCATE COMP "m1x_a[1]"        SITE "H17";  # GN18
+LOCATE COMP "m1x_a[2]"        SITE "F17";  # GP19
+LOCATE COMP "m1x_a[3]"        SITE "G18";  # GN19
+LOCATE COMP "m1x_a[4]"        SITE "D18";  # GP20
+LOCATE COMP "m1x_a[5]"        SITE "E17";  # GN20
+LOCATE COMP "m1x_a[6]"        SITE "C18";  # GP21
+LOCATE COMP "m1x_a[7]"        SITE "D17";  # GN21
+LOCATE COMP "m1x_a[8]"        SITE "B15";  # GP22
+LOCATE COMP "m1x_a[9]"        SITE "C15";  # GN22
+LOCATE COMP "m1x_a[10]"       SITE "B17";  # GP23
+LOCATE COMP "m1x_a[11]"       SITE "C17";  # GN23
+LOCATE COMP "m1x_a[12]"       SITE "C16";  # GP24
+LOCATE COMP "m1x_a[13]"       SITE "D16";  # GN24
+LOCATE COMP "m1x_a[14]"       SITE "D14";  # GP25
+LOCATE COMP "m1x_a[15]"       SITE "E14";  # GN25
+LOCATE COMP "m1x_addr_drv_n"  SITE "B13";  # GP26
+LOCATE COMP "m1x_test_drv"    SITE "C13";  # GN26
+LOCATE COMP "m1x_wait_drv"    SITE "D13";  # GP27
+LOCATE COMP "m1x_int_drv"     SITE "E13";  # GN27
+
+IOBUF PORT "m1x_d[*]"         PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_a[*]"         PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_rd_n"         PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_wr_n"         PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_in_n"         PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_out_n"        PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_ras_n"        PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_cas_n"        PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_mux"          PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_data_drv_n"   PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_addr_drv_n"   PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_oe_n"         PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_sysres_n"     PULLMODE=UP IO_TYPE=LVCMOS33;
+IOBUF PORT "m1x_intak_n"      PULLMODE=UP IO_TYPE=LVCMOS33;
+IOBUF PORT "m1x_int_n_rb"     PULLMODE=UP IO_TYPE=LVCMOS33;
+IOBUF PORT "m1x_wait_n_rb"    PULLMODE=UP IO_TYPE=LVCMOS33;
+IOBUF PORT "m1x_test_n_rb"    PULLMODE=UP IO_TYPE=LVCMOS33;
+IOBUF PORT "m1x_test_drv"     PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_wait_drv"     PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "m1x_int_drv"      PULLMODE=DOWN IO_TYPE=LVCMOS33 DRIVE=4;

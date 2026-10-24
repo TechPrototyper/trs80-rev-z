@@ -204,6 +204,19 @@ bridge falls back to the classic halt/peek/run automatically. The architecture,
 and the road to a dongle that debugs a *real* TRS-80 over a ribbon cable,
 is in [ADR-0006](docs/decisions/0006-debug-architecture.md).
 
+## Help wanted: a Model 1 for 40C3
+
+The next step is the physical dongle on a **real** Model 1 — the same debugger and, per
+[ADR-0013](docs/decisions/0013-ei-on-the-real-bus.md), the same Expansion-Interface RTL
+driving 1980 silicon through a level-shifting interposer on the 40-pin edge. For that we
+need a Model 1 keyboard unit on the bench, around Hamburg, for **40C3 (27–30 December
+2026)** or a day beforehand. If there is none, we are considering building one from
+RetroStack's MIT-licensed Rev G replica, together with people who like soldering — at
+home, in a hackerspace, or on the congress floor. Plan, pinout and BOM:
+[docs/INTERPOSER-PLAN.md](docs/INTERPOSER-PLAN.md) (§9 says how to help); cost and effort
+of the replica: [docs/REPLICA-OPTION.md](docs/REPLICA-OPTION.md). Issues welcome, German
+is fine.
+
 ## How this is run
 
 One maintainer, one specification, and a real interest in being corrected by

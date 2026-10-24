@@ -227,6 +227,15 @@ VRAM comparison against trs80gp, then on the ULX3S over HDMI with a USB keyboard
   extended to actual silicon. The Z80 itself stays 48 K — the surplus power
   works *for* the small machine, never inside it.
 
+  **Design fixed 2026-10-25, not started** ([ADR-0013](docs/decisions/0013-ei-on-the-real-bus.md)):
+  the interposer of [docs/INTERPOSER-PLAN.md](docs/INTERPOSER-PLAN.md) doubles as the
+  minimal Expansion Interface. Three operating modes from one bitstream — full machine /
+  EI + dongle on a real keyboard unit / dongle only — a bus front end in front of the
+  unchanged EI RTL, and a Z80 loader stub in the 0x3000 window that pulls /CMD files from
+  the SD card into real 16 K after `SYSTEM /12288`. A real Model 1 (borrowed, or a
+  RetroStack Rev G build — [docs/REPLICA-OPTION.md](docs/REPLICA-OPTION.md)) is the
+  prerequisite; see the README's help-wanted section.
+
 ### M7 — Sound & Gestalt (the machine you hear and see)
 
 Pulled ahead of M5/M6 by explicit maintainer priority (2026-08-21):
