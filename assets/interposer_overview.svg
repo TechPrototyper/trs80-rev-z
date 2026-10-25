@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="540" viewBox="0 0 1280 540" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#444"/>
+    </marker>
+    <style>
+      .box { fill:#fafafa; stroke:#333; stroke-width:2; rx:10; }
+      .box2 { fill:#fff8e6; stroke:#8a5a00; stroke-width:2; rx:10; }
+      .box3 { fill:#eef5ff; stroke:#1f4e8c; stroke-width:2; rx:10; }
+      .t { fill:#222; font-size:15px; }
+      .h { fill:#111; font-size:18px; font-weight:bold; }
+      .s { fill:#555; font-size:12.5px; }
+      .w { stroke:#444; stroke-width:2.5; fill:none; marker-end:url(#arr); marker-start:url(#arr); }
+      .lbl { fill:#333; font-size:12.5px; text-anchor:middle; }
+      .mode { fill:#f4f4f4; stroke:#777; stroke-width:1.5; rx:8; }
+    </style>
+  </defs>
+  <rect width="1280" height="540" fill="#ffffff"/>
+  <text x="20" y="34" class="h">TRS-80 Rev Z — the physical dongle, first draft</text>
+  <text x="20" y="56" class="s">ADR-0009 / ADR-0013, docs/INTERPOSER-PLAN.md. One ULX3S, one small level-shifter box, a real Model 1 keyboard unit. Nothing inside the old machine is modified.</text>
+
+  <!-- Mac -->
+  <rect x="20" y="100" width="190" height="160" class="box"/>
+  <text x="36" y="130" class="h">Mac / PC</text>
+  <text x="36" y="158" class="t">VS Code + DeZog</text>
+  <text x="36" y="180" class="t">trszog (revz remote)</text>
+  <text x="36" y="202" class="t">/CMD files to load</text>
+  <text x="36" y="236" class="s">source-level debugging</text>
+  <text x="36" y="252" class="s">of 1977 silicon</text>
+
+  <!-- USB -->
+  <line x1="210" y1="180" x2="290" y2="180" class="w"/>
+  <text x="250" y="166" class="lbl">USB</text>
+  <text x="250" y="200" class="lbl">FTDI UART</text>
+
+  <!-- ULX3S -->
+  <rect x="290" y="80" width="370" height="210" class="box3"/>
+  <text x="306" y="110" class="h">ULX3S-85F (Lattice ECP5)</text>
+  <text x="306" y="138" class="t">Mode 2: it is the Expansion Interface</text>
+  <text x="322" y="158" class="s">48 K RAM · WD1771 + Percom DD · 40 Hz heartbeat</text>
+  <text x="322" y="175" class="s">DMK disk images from the SD card</text>
+  <text x="306" y="202" class="t">Debug core + window 0x3000–0x37DF</text>
+  <text x="322" y="222" class="s">loader stub: SYSTEM, /12288 pulls a /CMD into RAM</text>
+  <text x="322" y="239" class="s">IM-2 entry via INTAK* · breakpoints · memory view</text>
+  <text x="306" y="268" class="s">Same EI RTL that drives the FPGA machine:</text>
+  <text x="306" y="283" class="s">differential verification, silicon vs. model.</text>
+
+  <!-- ribbon 3.3V -->
+  <line x1="660" y1="180" x2="740" y2="180" class="w"/>
+  <text x="700" y="160" class="lbl">42 wires</text>
+  <text x="700" y="200" class="lbl">3.3 V</text>
+  <text x="700" y="215" class="lbl">GP/GN 0–10</text>
+  <text x="700" y="229" class="lbl">and 18–27</text>
+
+  <!-- Interposer -->
+  <rect x="740" y="80" width="250" height="210" class="box2"/>
+  <text x="756" y="110" class="h">Interposer (boxed)</text>
+  <text x="756" y="138" class="t">5 × 74LVC245 level shifters</text>
+  <text x="772" y="158" class="s">A0–A15 · D0–D7 · RD* WR* IN* OUT*</text>
+  <text x="772" y="175" class="s">RAS* CAS* MUX · SYSRES* INTAK*</text>
+  <text x="756" y="202" class="t">3 × open drain (2N7002)</text>
+  <text x="772" y="222" class="s">TEST* · WAIT* · INT*</text>
+  <text x="756" y="252" class="s">OE* pull-ups: an unconfigured</text>
+  <text x="756" y="268" class="s">FPGA is never on the bus.</text>
+
+  <!-- ribbon 5V -->
+  <line x1="990" y1="180" x2="1070" y2="180" class="w"/>
+  <text x="1030" y="160" class="lbl">40-pin</text>
+  <text x="1030" y="200" class="lbl">5 V TTL</text>
+  <text x="1030" y="215" class="lbl">≤ 20 cm</text>
+
+  <!-- TRS-80 -->
+  <rect x="1070" y="100" width="190" height="160" class="box"/>
+  <text x="1086" y="130" class="h">TRS-80 Model 1</text>
+  <text x="1086" y="158" class="t">keyboard unit</text>
+  <text x="1086" y="180" class="t">real Z80 · 16 K</text>
+  <text x="1086" y="202" class="t">Level II ROM</text>
+  <text x="1086" y="236" class="s">40-pin expansion edge,</text>
+  <text x="1086" y="252" class="s">unmodified</text>
+
+  <!-- modes -->
+  <text x="20" y="340" class="h">Three operating modes, one bitstream, one DIP switch</text>
+  <rect x="20" y="360" width="400" height="160" class="mode"/>
+  <text x="36" y="388" class="t"><tspan font-weight="bold">Mode 1 — full machine</tspan></text>
+  <text x="36" y="412" class="s">Z80, ROM, RAM, video and EI all in the FPGA.</text>
+  <text x="36" y="430" class="s">Today's bitstream, the golden-verified core.</text>
+  <text x="36" y="448" class="s">The interposer is not attached.</text>
+
+  <rect x="440" y="360" width="400" height="160" class="mode"/>
+  <text x="456" y="388" class="t"><tspan font-weight="bold">Mode 2 — EI + dongle on a real Model 1</tspan></text>
+  <text x="456" y="412" class="s">The FPGA is the Expansion Interface: 48 K, FDC,</text>
+  <text x="456" y="430" class="s">DMK from SD, heartbeat. A DOS boots on 1980</text>
+  <text x="456" y="448" class="s">silicon; MEMORY SIZE? answers 48 K.</text>
+  <text x="456" y="478" class="s">Plus the debugger.</text>
+
+  <rect x="860" y="360" width="400" height="160" class="mode"/>
+  <text x="876" y="388" class="t"><tspan font-weight="bold">Mode 3 — dongle only</tspan></text>
+  <text x="876" y="412" class="s">The machine stays 16 K. The window at 0x3000</text>
+  <text x="876" y="430" class="s">serves the loader stub and the debug vectors.</text>
+  <text x="876" y="448" class="s">Opcode fetches from the window are the shortest</text>
+  <text x="876" y="466" class="s">bus cycles there are: the complete dongle test.</text>
+</svg>

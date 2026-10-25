@@ -11,6 +11,36 @@ in 1980 — as open, verified hardware description on the
 (yosys · nextpnr-ecp5 · prjtrellis · Verilator). Not an emulator: the machine itself,
 described in RTL, checked against the real schematics and against golden models.
 
+## 40C3 (27–30 December 2026, Hamburg): three things we are looking for
+
+The next step is to put this machine next to a **real** Model 1 and let the same debugger
+and the same Expansion-Interface RTL drive 1980 silicon through a small level-shifting
+adapter on the 40-pin expansion edge. First draft of the setup:
+
+![Interposer overview: Mac — ULX3S — interposer box — TRS-80 Model 1 keyboard unit](assets/interposer_overview.svg)
+
+1. **An original TRS-80 Model 1** — a keyboard unit is enough, an Expansion Interface is
+   *not* needed (in Mode 2 the FPGA is the EI). Lend it for the congress days or for a day
+   beforehand; we do not modify it. The adapter is observe-only unless told otherwise, and
+   its pull-ups keep an unconfigured FPGA off the bus.
+2. **Company to rebuild one** — if no original turns up, we build a Model 1 from
+   [Marcel Erz's RetroStack](https://github.com/RetroStack) MIT-licensed Rev G replica:
+   mainboard, MX keyboard, printed case. With people who like soldering, at home, in a
+   hackerspace, or on the congress floor. Five PCBs come in the minimum order; co-builders
+   keep one. Cost, effort and who does what: [docs/REPLICA-OPTION.md](docs/REPLICA-OPTION.md).
+
+   ![RetroStack TRS-80 Model I Rev G replica, assembled](assets/third_party/retrostack_rev_g_e1_photo.jpg)<br/>
+   *Photo: Marcel Erz / [RetroStack](https://github.com/RetroStack/TRS-80-Model-I-G-E1), MIT — the board we would build.*
+3. **Build the physical dongle** — the adapter that remote-debugs the real beast: five
+   74LVC245 banks, three open-drain drivers, a boxed board between two ribbons. The first
+   draft is complete enough to build on perfboard: plan and pinout in
+   [docs/INTERPOSER-PLAN.md](docs/INTERPOSER-PLAN.md), the machine-readable map and LPF in
+   [boards/ulx3s/interposer/](boards/ulx3s/interposer/), the three operating modes in
+   [ADR-0013](docs/decisions/0013-ei-on-the-real-bus.md). A KiCad schematic follows; help
+   drawing it is welcome.
+
+Issues in this repository are the contact. German is fine.
+
 ## The idea in one paragraph
 
 The existing TRS-80 FPGA cores each stop somewhere short of the machine I remember —
@@ -203,19 +233,6 @@ nothing; on targets without it (a real TRS-80 behind the dongle) the
 bridge falls back to the classic halt/peek/run automatically. The architecture,
 and the road to a dongle that debugs a *real* TRS-80 over a ribbon cable,
 is in [ADR-0006](docs/decisions/0006-debug-architecture.md).
-
-## Help wanted: a Model 1 for 40C3
-
-The next step is the physical dongle on a **real** Model 1 — the same debugger and, per
-[ADR-0013](docs/decisions/0013-ei-on-the-real-bus.md), the same Expansion-Interface RTL
-driving 1980 silicon through a level-shifting interposer on the 40-pin edge. For that we
-need a Model 1 keyboard unit on the bench, around Hamburg, for **40C3 (27–30 December
-2026)** or a day beforehand. If there is none, we are considering building one from
-RetroStack's MIT-licensed Rev G replica, together with people who like soldering — at
-home, in a hackerspace, or on the congress floor. Plan, pinout and BOM:
-[docs/INTERPOSER-PLAN.md](docs/INTERPOSER-PLAN.md) (§9 says how to help); cost and effort
-of the replica: [docs/REPLICA-OPTION.md](docs/REPLICA-OPTION.md). Issues welcome, German
-is fine.
 
 ## How this is run
 

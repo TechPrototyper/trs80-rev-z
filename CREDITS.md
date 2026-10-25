@@ -60,6 +60,12 @@ the days, which was sold, unfortunately, because we still had and kept the Model
   (`loaded-spin.wav`, `motor.wav`, `step.wav`) directly from the user's own
   trs80gp installation via `--drive-sounds`; the files are loaded in place at
   runtime and are not part of this repository.
+- **Marcel Erz / RetroStack** — photograph of the assembled TRS-80 Model I Rev G
+  replica (E1), from <https://github.com/RetroStack/TRS-80-Model-I-G-E1>
+  (`Latest/TRS80_Model_I_G_E1_Photo.png`), **MIT License**. Rescaled and converted to
+  JPEG as `assets/third_party/retrostack_rev_g_e1_photo.jpg` (provenance note in
+  `assets/third_party/README.md`). RetroStack's KiCad recreation of the Rev G board is
+  also one of this project's schematic references (see docs/RESEARCH.md).
 
 The golden-model verification methodology (byte-exact VRAM comparison, simulation before
 silicon) was developed in a predecessor Space Invaders project against trs80gp.
