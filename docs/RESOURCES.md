@@ -78,14 +78,19 @@ This project would not have been possible without many individuals hard work ove
 
 The TRS-80 ecosystem is distributed across traditional forums, project-specific groups, Facebook, Discord, events, and FPGA-development communities. Forums and repositories are best for durable technical discussions; Facebook and Discord are often better for reaching active users, emulator authors, collectors, and hardware owners quickly.
 
-- **[VCFed — Tandy/Radio Shack Forum](https://forum.vcfed.org/index.php?forums/tandy-radio-shack.59/)** — Broad and technically experienced vintage-computing community. Particularly useful for hardware behaviour, repairs, undocumented details, peripherals, and historical questions.
+- **[VCFed — Tandy/Radio Shack Forum](https://forum.vcfed.org/index.php?forums/tandy-radio-shack.58/)** — Broad and technically experienced vintage-computing community (4.8 K threads, daily posts as of 2026-10-25). Particularly useful for hardware behaviour, repairs, undocumented details, peripherals, and historical questions. Loan/wanted requests belong in [Vintage Computer Items Wanted](https://forum.vcfed.org/index.php?forums/vintage-computer-items-wanted.41/).
 
-- **[TRS-80.com](https://www.trs-80.com/)** — Major TRS-80 archive and news site covering machines, software, documentation, emulators, disk formats, preservation projects, and modern developments.
+- **Tandy Discord** — "A community of Tandy Radio Shack vintage computing enthusiasts", started 2019 by George Phillips, ~600 members, >100 online at a time (checked 2026-10-25). Current invite per the [VCFed thread](https://forum.vcfed.org/index.php?threads/trs-80-discord-server.69834/): `discord.gg/SuEh73MUbU` (earlier invites are dead). Fastest way to reach emulator authors, collectors and hardware owners; conclusions should still be written down in a forum or issue afterwards. The [CoCo Discord](https://discord.gg/4J5nHXm) (~1100 members) has a few non-CoCo channels, low traffic.
 
-- **TRS-80 Facebook groups** — Several active groups cover the Model I/III/4 family, games, repairs, software preservation, emulators, and the wider Tandy ecosystem. These are often the fastest way to locate original-hardware owners and people with highly specific practical experience.
+- **[forum.classic-computing.de — Tandy TRS-80](https://forum.classic-computing.de/forum/index.php?board/153-tandy-trs-80/)** (VzEkC e.V., German) — the German-speaking owners: ~200 threads, Model 1 repair and expansion threads with hundreds of replies in 2026. Also relevant: [Entwicklung](https://forum.classic-computing.de/forum/index.php?board/226-entwicklung/) (hardware projects, group orders), [Hamburg — Regionale Treffen](https://forum.classic-computing.de/forum/index.php?board/384-hamburg-regionale-treffen/) (a Schleswig-Holstein/Hamburg Stammtisch, several meetings a year), and the Marktplatz. New members introduce themselves in "User stellen sich vor" first.
 
-- **TRS-80 Discord servers** — General and project-specific servers provide direct access to developers, emulator users,
-collectors, and hardware specialists. Relevant conclusions should subsequently be documented in a repository, issue tracker, or forum because Discord discussions are difficult to preserve and cite.
+- **[r/trs80](https://www.reddit.com/r/trs80/)** — active; Model I posts draw owners and former owners.
+
+- **Mastodon / Bluesky** — Marcel Erz posts as [@retrostack@mastodon.social](https://mastodon.social/@retrostack); [@vcfe@mastodon.social](https://mastodon.social/@vcfe) (Vintage Computer Festival Europe, Munich); [oldbytes.space](https://oldbytes.space) is the retrocomputing instance. Hashtags: #TRS80 #retrocomputing #40C3. Amplifiers, not destinations — link the forum thread.
+
+- **40C3 / CCC** — the 40C3 hub is not open yet (2026-10-25). At 39C3 the "Vintage Computing Cluster" grouped the retro assemblies (e.g. [Neuschwabenland Retro Hacking](https://events.ccc.de/congress/2025/hub/en/assembly/detail/neuschwabenland)); [Attraktor e.V.](https://attraktor.org), the Hamburg hackerspace, was tagged retro and is the natural local partner for a soldering session.
+
+- **TRS-80 Facebook groups** — Several active groups cover the Model I/III/4 family, games, repairs, software preservation, emulators, and the wider Tandy ecosystem. Often the fastest way to locate original-hardware owners; names not verified here.
 
 - **[Tandy Assembly](https://www.tandyassembly.com/)** — The principal recurring gathering for the wider Tandy and Radio
 Shack computer community. Useful for personal contacts, demonstrations, original-hardware testing, technical talks, and contact with long-term users and developers.
